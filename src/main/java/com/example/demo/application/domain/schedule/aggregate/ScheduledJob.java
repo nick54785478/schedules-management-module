@@ -28,9 +28,9 @@ import lombok.NoArgsConstructor;
 
 @Entity
 @Getter
-@AllArgsConstructor
 @Table(name = "schedule_job")
 @EntityListeners(AuditingEntityListener.class)
+@AllArgsConstructor(access = AccessLevel.PRIVATE)
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class ScheduledJob {
 
@@ -68,6 +68,19 @@ public class ScheduledJob {
 	private LocalDateTime updatedAt;
 
 	/**
+	 * 工廠類方法，用於註冊 Schedule Job
+	 * 
+	 * @param jobId   JobID
+	 * @param name    排程名稱
+	 * @param group   群組
+	 * @param jobType 對應的 Job 標籤
+	 * @param cron    Cron
+	 */
+	public static ScheduledJob register(JobId jobId, String name, String group, String jobType, CronExpression cron) {
+		return new ScheduledJob(null, jobId, name, group, jobType, cron, JobStatus.NORMAL);
+	}
+
+	/**
 	 * 業務行為：修改排程
 	 */
 	public void changeSchedule(String newCron) {
@@ -102,5 +115,19 @@ public class ScheduledJob {
 	 */
 	public void updateCron(CronExpression newCron) {
 		this.cron = newCron;
+	}
+
+	/**
+	 * Private Constructor
+	 */
+	private ScheduledJob(Long id, JobId jobId, String name, String group, String jobType, CronExpression cron,
+			JobStatus status) {
+		this.id = id;
+		this.jobId = jobId;
+		this.name = name;
+		this.group = group;
+		this.jobType = jobType;
+		this.cron = cron;
+		this.status = status;
 	}
 }

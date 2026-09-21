@@ -9,7 +9,7 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class CreateScheduleJobCommand {
+public class RegisterScheduleJobCommand {
 
 	private String jobName;
 

@@ -13,7 +13,6 @@ import org.springframework.transaction.annotation.Transactional;
 import com.example.demo.application.domain.schedule.aggregate.ScheduledJob;
 import com.example.demo.application.domain.schedule.aggregate.vo.CronExpression;
 import com.example.demo.application.domain.schedule.aggregate.vo.JobId;
-import com.example.demo.application.domain.schedule.aggregate.vo.JobStatus;
 import com.example.demo.application.port.CronParserPort;
 import com.example.demo.application.port.JobSchedulerPort;
 import com.example.demo.application.shared.command.RegisterJobCommand;
@@ -79,8 +78,10 @@ public class ScheduledJobApplicationService {
 			// 這裡亦建議使用 parser 確保初始 Cron 的合法性
 			CronExpression cron = cronParser.parse(command.cronExpression());
 
-			ScheduledJob newJob = new ScheduledJob(null, jobId, command.name(), command.group(), command.jobType(),
-					cron, JobStatus.NORMAL, null, null);
+			ScheduledJob newJob = ScheduledJob.register(jobId, command.name(), command.group(), command.jobType(),
+					cron);
+//			ScheduledJob newJob = new ScheduledJob(null, jobId, command.name(), command.group(), command.jobType(),
+//					cron, JobStatus.NORMAL, null, null);
 			repository.save(newJob);
 		} else {
 			log.info("排程配置已存在，準備執行引擎同步: {}", command.name());
