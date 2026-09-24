@@ -38,6 +38,9 @@
 
 1. 在 Scheduler 內建置相關排程工作
 >* **實作 Job 類別**：建立一個實作 `org.quartz.Job` 的類別，並標註 `@Component` 由 Spring 託管。
+>* **架構定位 (Inbound Adapter)**：在六角架構中，Quartz 的 `Job` 扮演的是 **驅動端適配器 (Inbound Adapter)**，職責等同於 API Controller。
+>  * **✅ 允許介接**：只能注入並呼叫 **Application Service (Use Case / Inbound Port)**，將參數轉換為 Command，並由應用層統一管理事務邊界 (`@Transactional`)。
+>  * **❌ 嚴禁介接**：絕對禁止直接注入 Outbound Port (如 DB Repository)、禁止在 `execute` 方法內直接編寫業務邏輯，也禁止由 Job 自行管理 Transaction。
 >* **動態解析機制**：根據 `JobSchedulerAdapter.lookupJobClass` 的設計，系統會直接透過 **Bean Name** 來建置對應的 Job 類別。這避免了在資料庫硬編碼類別路徑 (Class Path)，包名更動時系統依然穩定，達到 Domain 與技術實作解耦。
 
 2. 註冊該排程至系統中 (二擇一)
