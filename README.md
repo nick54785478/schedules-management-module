@@ -34,13 +34,15 @@
 
 ## 開發者指南
 
-1. 新增一個 Job
->* 實作 Job 類別：建立一個繼承 org.quartz.Job 的類別。
->* 註冊 JobType：在 JobType 列舉中新增定義。
->* 適配器配置：在 QuartzAdapter 的 createJobDetail 中加入對應邏輯。
+### 建立一支排程工作的步驟
 
-2. 透過 initializeTask 方法在 ScheduleJobRegistration 內註冊該排程  
-註. 此方法具備冪等性 (Replace 模式)
+1. 在 Scheduler 內建置相關排程工作
+>* **實作 Job 類別**：建立一個實作 `org.quartz.Job` 的類別，並標註 `@Component` 由 Spring 託管。
+>* **動態解析機制**：根據 `JobSchedulerAdapter.lookupJobClass` 的設計，系統會直接透過 **Bean Name** 來建置對應的 Job 類別。這避免了在資料庫硬編碼類別路徑 (Class Path)，包名更動時系統依然穩定，達到 Domain 與技術實作解耦。
+
+2. 註冊該排程至系統中 (二擇一)
+>* **系統啟動時註冊**：透過 `ScheduleJobRegistration` 內的 `initializeTask` 方法註冊（此方法具備冪等性 Replace 模式），並將 `jobType` 參數指定為您的 Bean Name。
+>* **透過 API 動態新增**：呼叫 `POST /jobs/create`，並在請求的 `jobType` 傳入您的 Bean Name。
 
 3. 自定義排程監聽器 (Observer Pattern)
 >* 實作介面：建立類別並實作 `com.example.demo.application.shared.listener.JobStatusListener` 介面。
@@ -73,6 +75,12 @@
 >* Method: POST
 >* Path: /update-cron
 >* 描述: 修改特定任務的執行週期。
+
+**5. 新增排程任務**
+>* Method: POST
+>* Path: /create
+>* 描述: 註冊一個新的排程任務到系統與 Quartz 引擎中。需傳遞任務名稱、群組、Cron 表達式以及對應的 Bean Name (`jobType`)。
+>* 冪等性: 採用 Replace 模式，若相同 `name` 與 `group` 的排程已存在則會進行覆寫。
 
 ## 運維監控與異常處理
 

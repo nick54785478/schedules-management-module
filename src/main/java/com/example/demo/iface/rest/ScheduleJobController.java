@@ -1,10 +1,13 @@
 package com.example.demo.iface.rest;
 
 import com.example.demo.application.service.ScheduledJobApplicationService;
+import com.example.demo.application.shared.command.CreateJobCommand;
 import com.example.demo.application.shared.command.UpdateJobCronCommand;
 import com.example.demo.application.shared.view.ScheduleJobView;
+import com.example.demo.iface.dto.req.CreateJobResource;
 import com.example.demo.iface.dto.req.UpdateJobCronResource;
 import com.example.demo.iface.dto.res.JobCronUpdatedResource;
+import com.example.demo.iface.dto.res.ScheduleJobCreatedResource;
 import com.example.demo.iface.dto.res.ScheduleJobPausedResource;
 import com.example.demo.iface.dto.res.ScheduleJobResumedResource;
 import io.swagger.v3.oas.annotations.Operation;
@@ -30,6 +33,17 @@ public class ScheduleJobController {
     private ScheduledJobApplicationService applicationService;
 
     /**
+     * 新增排程任務
+     */
+    @Operation(summary = "新增排程任務", description = "註冊一個新的排程任務到系統與 Quartz 引擎中")
+    @PostMapping("/create")
+    public ResponseEntity<ScheduleJobCreatedResource> createJob(@RequestBody CreateJobResource request) {
+        CreateJobCommand command = new CreateJobCommand(request.name(), request.group(), request.cron(), request.jobType());
+        applicationService.initializeTask(command);
+        return new ResponseEntity<>(new ScheduleJobCreatedResource("201", "排程任務建立成功"), HttpStatus.CREATED);
+    }
+
+    /**
      * 暫停特定的排程
      */
     @Operation(summary = "暫停特定的排程", description = "根據 JobId 暫停正在運行的排程任務")
@@ -41,8 +55,6 @@ public class ScheduleJobController {
 
     /**
      * 重啟特定的排程
-     *
-     * @throws Exception
      */
     @Operation(summary = "重啟特定的排程", description = "根據 JobId 恢復已被暫停的排程任務")
     @PostMapping("/resume/{jobId}")

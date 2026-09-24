@@ -1,4 +1,4 @@
-package com.example.demo.iface.schedule;
+package com.example.demo.iface.scheduler;
 
 import org.quartz.DisallowConcurrentExecution;
 import org.quartz.Job;
