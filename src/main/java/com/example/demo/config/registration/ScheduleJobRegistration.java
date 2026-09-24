@@ -1,5 +1,6 @@
 package com.example.demo.config.registration;
 
+import com.example.demo.application.shared.command.CreateJobCommand;
 import org.quartz.SchedulerException;
 import org.springframework.stereotype.Component;
 
@@ -76,10 +77,9 @@ public class ScheduleJobRegistration {
 	 * @param groupName      Job 所屬群組
 	 * @param cronExpression Cron 表達式
 	 * @param jobClass       Quartz Job 類型，對應 @Component 名稱
-	 * @throws SchedulerException 註冊失敗時拋出
 	 */
 	private void registerSystemJob(String jobName, String groupName, String cronExpression, String jobClass) {
-		RegisterJobCommand command = new RegisterJobCommand(jobName, groupName, cronExpression, jobClass);
+		CreateJobCommand command = new CreateJobCommand(jobName, groupName, cronExpression, jobClass);
 		applicationService.initializeTask(command);
 	}
 
