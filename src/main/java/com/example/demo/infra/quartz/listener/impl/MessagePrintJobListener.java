@@ -2,7 +2,7 @@ package com.example.demo.infra.quartz.listener.impl;
 
 import org.springframework.stereotype.Component;
 
-import com.example.demo.infra.quartz.listener.JobStatusListener;
+import com.example.demo.application.shared.listener.JobStatusListener;
 
 import lombok.extern.slf4j.Slf4j;
 

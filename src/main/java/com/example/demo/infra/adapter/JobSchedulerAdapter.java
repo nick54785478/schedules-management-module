@@ -29,7 +29,7 @@ import com.example.demo.application.port.JobSchedulerPort;
 import com.example.demo.application.shared.command.RegisterJobCommand;
 import com.example.demo.application.shared.command.UpdateJobCronCommand;
 import com.example.demo.application.shared.view.ScheduleJobView;
-import com.example.demo.infra.quartz.listener.JobStatusListener;
+import com.example.demo.application.shared.listener.JobStatusListener;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

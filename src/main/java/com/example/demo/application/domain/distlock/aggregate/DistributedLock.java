@@ -15,6 +15,10 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+/**
+ * 分布式鎖實作
+ * 目前已棄用，由 Quartz 的分布式鎖來取代
+ * */
 @Getter
 @Entity
 @NoArgsConstructor

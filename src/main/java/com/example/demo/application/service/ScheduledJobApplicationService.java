@@ -71,15 +71,11 @@ public class ScheduledJobApplicationService {
 
         if (existingJob.isEmpty()) {
             log.info("初始化新排程紀錄: {} - {}", command.name(), command.group());
-//			JobId jobId = new JobId(UUID.randomUUID().toString());
 
             // 這裡亦建議使用 parser 確保初始 Cron 的合法性
             CronExpression cron = cronParser.parse(command.cronExpression());
-
             ScheduledJob newJob = ScheduledJob.register(command.name(), command.group(), command.jobType(),
                     cron);
-//			ScheduledJob newJob = new ScheduledJob(null, jobId, command.name(), command.group(), command.jobType(),
-//					cron, JobStatus.NORMAL, null, null);
             repository.save(newJob);
         } else {
             log.info("排程配置已存在，準備執行引擎同步: {}", command.name());

@@ -8,15 +8,14 @@ import org.quartz.SchedulerException;
 import com.example.demo.application.shared.command.RegisterJobCommand;
 import com.example.demo.application.shared.command.UpdateJobCronCommand;
 import com.example.demo.application.shared.view.ScheduleJobView;
-import com.example.demo.infra.quartz.listener.JobStatusListener;
+import com.example.demo.application.shared.listener.JobStatusListener;
 
 /**
  * <h2>JobSchedulerPort</h2>
  * <p>
  * 定義排程執行引擎的輸出埠（Output Port）。 負責規範排程任務的生命週期管理動作，包含註冊、暫停、恢復與查詢。
  * </p>
- * 
- * @author Gemini Assistant
+ *
  */
 public interface JobSchedulerPort {
 

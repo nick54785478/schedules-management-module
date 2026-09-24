@@ -42,6 +42,11 @@
 2. 透過 initializeTask 方法在 ScheduleJobRegistration 內註冊該排程  
 註. 此方法具備冪等性 (Replace 模式)
 
+3. 自定義排程監聽器 (Observer Pattern)
+>* 實作介面：建立類別並實作 `com.example.demo.application.shared.listener.JobStatusListener` 介面。
+>* 業務隔離：純技術用途的監聽器（如耗時統計）可放於 `infra`，若牽涉業務邏輯（如失敗寄信、更新業務表）可放於 `application/service` 或 `iface`。
+>* 集中註冊：在 `ScheduleJobRegistration.java` (設定層) 中，利用 `jobScheduler.registerJobListener()` 將自定義監聽器掛載至對應的 Job 上，完成解耦。
+
 ## API 接口說明
 
 所有 API 基礎路徑為 /jobs。

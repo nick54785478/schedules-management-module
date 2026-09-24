@@ -15,6 +15,8 @@ public class MessagePrintJob implements Job {
 
 	@Override
 	public void execute(JobExecutionContext context) throws JobExecutionException {
+		
+		// 視情況定義執行流程
 		log.info("這是一支印出訊息的排程任務");
 	}
 }
