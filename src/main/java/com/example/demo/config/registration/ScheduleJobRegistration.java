@@ -9,6 +9,7 @@ import com.example.demo.application.service.ScheduledJobApplicationService;
 import com.example.demo.application.shared.command.RegisterJobCommand;
 import com.example.demo.infra.quartz.listener.global.GlobalJobListener;
 import com.example.demo.infra.quartz.listener.impl.MessagePrintJobListener;
+import com.example.demo.infra.quartz.listener.impl.PersistJobLogListener;
 
 import jakarta.annotation.PostConstruct;
 import lombok.AllArgsConstructor;
@@ -40,6 +41,7 @@ public class ScheduleJobRegistration {
 	private final JobSchedulerPort jobScheduler; // 執行引擎 (Quartz)
 	private final GlobalJobListener globalJobListener; // 假設這是一個全域 Log 監聽器
 	private final MessagePrintJobListener messagePrintJobListener;
+	private final PersistJobLogListener persistJobLogListener; // 持久化日誌監聽器
 	private final ScheduledJobApplicationService applicationService;
 
 	@PostConstruct
@@ -49,6 +51,7 @@ public class ScheduleJobRegistration {
 
 		// 1. 註冊全域監聽器 (處理日誌計時、性能監控)
 		jobScheduler.registerGlobalListener(globalJobListener);
+		jobScheduler.registerGlobalListener(persistJobLogListener); // 註冊持久化日誌監聽器
 
 		// 2. 註冊特定任務監聽器 (例如 MessagePrintJob 專屬的業務處理)
 		// 必須與 registerSystemJob 中的 name, group 保持一致

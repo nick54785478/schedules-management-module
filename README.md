@@ -85,9 +85,19 @@
 >* 描述: 註冊一個新的排程任務到系統與 Quartz 引擎中。需傳遞任務名稱、群組、Cron 表達式以及對應的 Bean Name (`jobType`)。
 >* 冪等性: 採用 Replace 模式，若相同 `name` 與 `group` 的排程已存在則會進行覆寫。
 
-## 運維監控與異常處理
+## 運維監控與執行日誌
 
-**異常代碼定義**
+**1. 排程執行日誌持久化 (Job Execution Logging)**
+> 系統內建全域的排程歷史紀錄功能，可將每一次排程的成功、失敗、中止事件記錄於資料庫 `schedule_job_log` 表中。
+>* **隔離的事務設計**: 核心採用 `REQUIRES_NEW` 開啟獨立事務，確保即使您的業務邏輯發生嚴重例外導致 Transaction Rollback，日誌依然能成功保存，精準記錄失敗原因。
+>* **執行緒安全 (Thread-Safety)**: 底層使用 `ThreadLocal` 綁定 Quartz Worker Thread 記錄任務起始時間，在高併發執行下依然保證耗時計算 (`durationMs`) 的絕對正確。
+>* **功能開關 (Feature Toggle)**: 預設關閉。可透過配置檔 `app.schedule.job-log.enabled=true` 開啟。關閉狀態下會直接 Return，達成真正的零效能負擔 (Zero Overhead)。
+**2. 分散式叢集下的 Listener 行為 (Distributed Listener Behavior)**
+> 在多節點的叢集環境中，Quartz 的 Listener 具備以下特性：
+>* **叢集唯一觸發保證**: 依賴資料庫 `QRTZ_LOCKS` 行鎖機制，同一個排程任務在同一時間點只會被「一台」機器搶得執行權。因此，全域 Listener (如 `GlobalJobListener`, `PersistJobLogListener`) **只會在那一台執行的機器上被觸發一次**，不會產生併發重複寫入日誌的問題。
+>* **業務冪等性需自行控制 (重要)**: 若執行任務的機器中途崩潰 (Crash) 且排程配置了 `RequestsRecovery`，Quartz 會將任務轉交由另一台機器重新執行，此時 Listener 會被**再次觸發**。Quartz 原生不保證 Listener 內部業務的絕對冪等，若於 Listener 內實作敏感業務 (如發信、扣款)，必須自行實作冪等控制 (如 Unique Key 或 Redis Check)。
+
+**3. 異常代碼定義**
 >* INVALID_CRON (422): 使用者輸入的 Cron 格式錯誤（如：日與週同時指定）。
 >* JOB_NOT_FOUND (404): 操作了不存在的任務識別碼。
 >* ENGINE_ERROR (500): Quartz 引擎發生底層技術故障（如：資料庫連線中斷）。
