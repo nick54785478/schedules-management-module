@@ -60,10 +60,6 @@ public class ScheduleJobRegistration {
 		// 參數說明: 任務名稱, 群組名稱, Cron 表達式, Spring Bean 名稱
 		this.registerSystemJob("MessagePrintJob", "MessagePrintGroup", "0 0/1 * * * ?", "messagePrintJob");
 
-		// 2. 過期鎖清理任務 (每 1 分鐘)
-		this.registerSystemJob("ExpiredLocksCleanupJob", "ExpiredLocksCleanupGroup", "0 0/1 * * * ?",
-				"expiredLocksCleanupJob" // 這裡要對應你 ExpiredLocksCleanupJob 的 @Component 名稱
-		);
 	}
 
 	/**
