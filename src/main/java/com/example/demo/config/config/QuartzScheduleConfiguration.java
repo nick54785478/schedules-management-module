@@ -1,5 +1,7 @@
 package com.example.demo.config.config;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Properties;
 
 import javax.sql.DataSource;
@@ -25,24 +27,37 @@ public class QuartzScheduleConfiguration {
 	}
 
 	@Bean
-	public SchedulerFactoryBean schedulerFactoryBean(DataSource dataSource, AutowiringSpringBeanJobFactory jobFactory) {
+	@org.springframework.boot.context.properties.ConfigurationProperties(prefix = "spring.quartz")
+	public QuartzCustomProperties quartzCustomProperties() {
+		return new QuartzCustomProperties();
+	}
+
+	public static class QuartzCustomProperties {
+		private Map<String, String> properties = new HashMap<>();
+
+		public Map<String, String> getProperties() {
+			return properties;
+		}
+
+		public void setProperties(java.util.Map<String, String> properties) {
+			this.properties = properties;
+		}
+	}
+
+	@Bean
+	public SchedulerFactoryBean schedulerFactoryBean(DataSource dataSource, AutowiringSpringBeanJobFactory jobFactory,
+			QuartzCustomProperties quartzCustomProperties) {
 		SchedulerFactoryBean factory = new SchedulerFactoryBean();
 		factory.setDataSource(dataSource);
 		factory.setJobFactory(jobFactory);
 
-		// 建立 Properties 物件來承接叢集設定
+		// 建立 Properties 物件，並直接載入 application.properties 中的所有 spring.quartz.properties.* 設定
 		Properties properties = new Properties();
-
-		// --- 分布式核心配置 ---
-		// 必須設為 true
-		properties.put("org.quartz.jobStore.isClustered", "true");
-		// 必須設為 AUTO，讓各節點自動產生唯一 ID (如: DESKTOP-NICK_171487...)
-		properties.put("org.quartz.scheduler.instanceId", "AUTO");
-		// 叢集檢查心跳間隔 (建議 10-20 秒)
-		properties.put("org.quartz.jobStore.clusterCheckinInterval", "15000");
-		// 資料庫驅動委託類
-		properties.put("org.quartz.jobStore.driverDelegateClass", "org.quartz.impl.jdbcjobstore.StdJDBCDelegate");
-		// 設置 AutowiringSpringBeanJobFactory，使其受框架管理
+		if (quartzCustomProperties.getProperties() != null) {
+			properties.putAll(quartzCustomProperties.getProperties());
+		}
+		
+		// 設置 Quartz 屬性與自定義的 JobFactory
 		factory.setQuartzProperties(properties);
 		return factory;
 	}
