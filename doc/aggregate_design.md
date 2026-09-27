@@ -11,8 +11,8 @@
 *   **`String name`**: 業務名稱，與 `group` 共同組成 Quartz 引擎中的唯一鍵 (`JobKey`)。
 *   **`String group`**: 業務分組。
 *   **`String jobType`**: 技術對應標籤，實際上儲存的是 Spring 容器中 `org.quartz.Job` 實作的 **Bean Name**。
-*   **`CronExpression cron`**: 執行週期，以數值物件 (VO) 的形式存在。
-*   **`JobStatus status`**: 業務狀態，包含 `NORMAL`（正常）、`PAUSED`（暫停）、`STOPPED`（停止）。
+*   **`ScheduleRule scheduleRule`**: 排程規則 (VO)，採用 Tagged Union 模式封裝了 Cron 或是 OneTime 排程型態，並可選配綁定排程日曆 (Calendar)。
+*   **`JobStatus status`**: 業務狀態，包含 `NORMAL`（正常）、`PAUSED`（暫停）、`STOPPED`（停止）與 `COMPLETED`（已完成，專用於一次性任務）。
 
 ### 業務行為 (Business Behaviors)
 所有的狀態變更都必須透過聚合根暴露的方法進行，確保狀態一致性：
@@ -23,7 +23,23 @@
 
 ---
 
-## 2. 數值物件 (Value Objects)
+## 2. 聚合根 (Aggregate Root): `ScheduleCalendar`
+
+`ScheduleCalendar` 是專門管理「排程日曆」的聚合根。它負責維護全域的黑名單例外日期 (如：國定假日、週末)，並且能被多個 `ScheduledJob` 共用。
+
+### 屬性定義
+*   **`String name`**: 領域唯一識別名稱（如：`TAIWAN_HOLIDAY_2026`），對應 Quartz 引擎內的 Calendar Name。
+*   **`String description`**: 人類可讀的日曆描述。
+*   **`Set<LocalDate> excludedDates`**: 具體要排除的日期集合（黑名單），以此阻擋排程在這些日子執行。
+
+### 業務行為 (Business Behaviors)
+*   **`create(...)` (Factory Method)**: 建立一個全新的空白日曆。
+*   **`addExcludedDate(LocalDate date)`**: 將特定日期加入排除清單（例如：新增國定假日）。
+*   **`removeExcludedDate(LocalDate date)`**: 將特定日期移出排除清單（例如：補班日需正常執行）。
+
+---
+
+## 3. 數值物件 (Value Objects)
 
 為了避免 Primitive Obsession（基本型別偏執），領域層使用了數值物件來包裝特定的概念。
 
@@ -33,10 +49,9 @@
 ### `JobStatus` (Enum)
 *   **狀態枚舉**: 定義了 `NORMAL`、`PAUSED`、`STOPPED`，限制了排程狀態的可能值，避免無效狀態的產生。
 
-### `CronExpression` (Record)
-*   **設計目的**: 封裝 Cron 語法字串。
-*   **「純粹領域」設計原則**:
-    仔細觀察會發現，`CronExpression` 內部並沒有撰寫複雜的正則表達式或呼叫 Quartz 的工具類別來檢核格式。這是因為：
-    1. **避免技術污染**: 領域層 (Domain) 應該是純粹的 Java 程式碼，不應依賴外部基礎設施 (如 Quartz 函式庫)。
-    2. **由 Application 層把關**: 系統設計了 `CronParserPort`。在 Application Service 接收到外部請求時，會先透過這個 Port（實作端會呼叫 Quartz 進行校驗）檢查語法。只有**合法**的字串兩者才會被轉換成 `CronExpression` 傳入領域層。
-    3. **結果**: 確保了只要 `CronExpression` 被建立出來，它代表的就「一定」是一個合法的 Cron 週期，將髒資料完美阻絕於領域層之外。
+### `ScheduleRule` (Embeddable VO)
+*   **設計目的**: 將排程的多型狀態（Cron 定時任務 vs. OneTime 一次性任務）以及綁定的 Calendar 名稱封裝在一起。
+*   **「純粹領域」設計原則**: 
+    1. 採用 Tagged Union (多型退化為屬性標籤) 設計，透過 `ScheduleType` 來區分目前存放的是 Cron 字串還是精確的 `LocalDateTime`。
+    2. 結合 JPA `@Embeddable` 將屬性扁平化映射至同一張表，避免關聯表帶來的複雜度。
+    3. 保留了 `calendarName` 作為與 `ScheduleCalendar` 聚合根的 Soft Link (軟連結)，實現跨聚合的鬆耦合協作。
