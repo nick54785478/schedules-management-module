@@ -1,11 +1,14 @@
 package com.example.demo.application.service;
 
 import com.example.demo.application.domain.schedule.aggregate.ScheduledJob;
-import com.example.demo.application.domain.schedule.aggregate.vo.CronExpression;
+import com.example.demo.application.domain.schedule.aggregate.vo.ScheduleRule;
+import com.example.demo.application.domain.schedule.aggregate.vo.ScheduleType;
 import com.example.demo.application.domain.schedule.aggregate.vo.JobId;
 import com.example.demo.application.port.CronParserPort;
 import com.example.demo.application.port.JobSchedulerPort;
-import com.example.demo.application.shared.command.CreateJobCommand;
+import com.example.demo.application.shared.command.BindJobCalendarCommand;
+import com.example.demo.application.shared.command.CreateCronJobCommand;
+import com.example.demo.application.shared.command.CreateOneTimeJobCommand;
 import com.example.demo.application.shared.command.RegisterJobCommand;
 import com.example.demo.application.shared.command.UpdateJobCronCommand;
 import com.example.demo.application.shared.exception.InvalidCronException;
@@ -49,41 +52,54 @@ public class ScheduledJobApplicationService {
     private final CronParserPort cronParser; // 領域門神 (Cron 校驗與解析)
 
     /**
-     * <h2>初始化排程任務</h2>
-     * <p>
-     * 系統啟動或手動觸發時，同步排程定義至資料庫與 Quartz 引擎。
-     * </p>
-     *
-     * <p>
-     * <b>執行邏輯：</b>
-     * </p>
-     * <ol>
-     * <li>檢查資料庫，若無紀錄則建立新的 {@link ScheduledJob} 聚合根。</li>
-     * <li>調用引擎適配器進行註冊，利用 Replace 模式確保 Cron 設定與程式碼同步。</li>
-     * </ol>
-     *
-     * @param command 包含任務名稱、群組及初始配置的指令
-     * @throws RuntimeException 若 Quartz 引擎註冊失敗且無法復原時拋出
+     * <h2>初始化定時排程任務 (Cron)</h2>
      */
     @Transactional
-    public void initializeTask(CreateJobCommand command) {
+    public void initializeCronTask(CreateCronJobCommand command) {
         Optional<ScheduledJob> existingJob = repository.findByNameAndGroup(command.name(), command.group());
 
         if (existingJob.isEmpty()) {
             log.info("初始化新排程紀錄: {} - {}", command.name(), command.group());
 
-            // 這裡亦建議使用 parser 確保初始 Cron 的合法性
-            CronExpression cron = cronParser.parse(command.cronExpression());
-            ScheduledJob newJob = ScheduledJob.register(command.name(), command.group(), command.jobType(),
-                    cron);
+            ScheduleRule rule = createScheduleRule(ScheduleType.CRON.name(), command.cronExpression(), null, command.calendarKey());
+            ScheduledJob newJob = ScheduledJob.register(command.name(), command.group(), command.jobType(), rule);
             repository.save(newJob);
         } else {
             log.info("排程配置已存在，準備執行引擎同步: {}", command.name());
         }
 
         try {
+            ScheduleRule ruleToRegister = createScheduleRule(ScheduleType.CRON.name(), command.cronExpression(), null, command.calendarKey());
             RegisterJobCommand registerJobCommand = new RegisterJobCommand(command.name(),
-                    command.group(), command.cronExpression(), command.jobType());
+                    command.group(), ruleToRegister, command.jobType());
+            jobScheduler.add(registerJobCommand);
+        } catch (Exception e) {
+            log.error("Quartz 引擎註冊失敗: {}.{}", command.group(), command.name(), e);
+            throw new RuntimeException("系統排程初始化失敗", e);
+        }
+    }
+
+    /**
+     * <h2>初始化一次性排程任務 (OneTime)</h2>
+     */
+    @Transactional
+    public void initializeOneTimeTask(CreateOneTimeJobCommand command) {
+        Optional<ScheduledJob> existingJob = repository.findByNameAndGroup(command.name(), command.group());
+
+        if (existingJob.isEmpty()) {
+            log.info("初始化新一次性排程紀錄: {} - {}", command.name(), command.group());
+
+            ScheduleRule rule = createScheduleRule(ScheduleType.ONE_TIME.name(), null, command.executeTime(), null);
+            ScheduledJob newJob = ScheduledJob.register(command.name(), command.group(), command.jobType(), rule);
+            repository.save(newJob);
+        } else {
+            log.info("排程配置已存在，準備執行引擎同步: {}", command.name());
+        }
+
+        try {
+            ScheduleRule ruleToRegister = createScheduleRule(ScheduleType.ONE_TIME.name(), null, command.executeTime(), null);
+            RegisterJobCommand registerJobCommand = new RegisterJobCommand(command.name(),
+                    command.group(), ruleToRegister, command.jobType());
             jobScheduler.add(registerJobCommand);
         } catch (Exception e) {
             log.error("Quartz 引擎註冊失敗: {}.{}", command.group(), command.name(), e);
@@ -108,16 +124,19 @@ public class ScheduledJobApplicationService {
         ScheduledJob job = repository.findByNameAndGroup(command.name(), command.group())
                 .orElseThrow(() -> new JobNotFoundException(command.name()));
 
-        // 2. 透過門神 (Parser) 取得合法的 VO。若格式錯誤，此處會拋出 InvalidCronException 並回滾。
-        CronExpression newCron = cronParser.parse(command.newCron());
+        // 2. 建立新規則，並繼承既有的 calendarKey。若格式錯誤，會拋出對應 Exception。
+        String existingCalendarKey = job.getScheduleRule().getCalendarKey();
+        ScheduleRule newRule = createScheduleRule(command.scheduleType(), command.newCron(), command.executeTime(), existingCalendarKey);
 
         // 3. 領域聚合根更新狀態
-        job.updateCron(newCron);
+        job.updateScheduleRule(newRule);
 
         // 4. 同步至執行引擎
         try {
-            // 注意：此處應調用 jobScheduler.updateCron 以確保引擎同步
-            jobScheduler.updateCron(command);
+            // 使用 RegisterJobCommand (因為 JobSchedulerAdapter.add() 的 replace=true 會覆寫 Trigger，也能正確帶入最新的 rule)
+            RegisterJobCommand registerJobCommand = new RegisterJobCommand(job.getName(),
+                    job.getGroup(), job.getScheduleRule(), job.getJobType());
+            jobScheduler.add(registerJobCommand);
         } catch (Exception e) {
             throw new ScheduleEngineException("UPDATE_CRON", job.getName(), e);
         }
@@ -125,6 +144,35 @@ public class ScheduledJobApplicationService {
         // 5. 保存業務狀態
         repository.save(job);
         log.info("任務 Cron 更新成功: {}.{}", job.getGroup(), job.getName());
+    }
+    /**
+     * <h2>綁定/解除綁定日曆</h2>
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public void bindCalendar(BindJobCalendarCommand command) {
+        ScheduledJob job = repository.findByNameAndGroup(command.name(), command.group())
+                .orElseThrow(() -> new JobNotFoundException(command.name()));
+
+        ScheduleRule currentRule = job.getScheduleRule();
+        ScheduleRule newRule = createScheduleRule(
+                currentRule.getType().name(), 
+                currentRule.getCronExpression(), 
+                currentRule.getExecuteTime(), 
+                command.calendarKey());
+
+        job.updateScheduleRule(newRule);
+
+        try {
+            // 將更新後的 Trigger 重新註冊到 Quartz
+            RegisterJobCommand registerJobCommand = new RegisterJobCommand(job.getName(),
+                    job.getGroup(), job.getScheduleRule(), job.getJobType());
+            jobScheduler.add(registerJobCommand);
+        } catch (Exception e) {
+            throw new ScheduleEngineException("BIND_CALENDAR", job.getName(), e);
+        }
+
+        repository.save(job);
+        log.info("任務日曆綁定更新成功: {}.{}", job.getGroup(), job.getName());
     }
 
     /**
@@ -183,7 +231,8 @@ public class ScheduledJobApplicationService {
 
             ScheduleJobView.ScheduleJobViewBuilder builder = ScheduleJobView.builder().jobId(dbJob.getJobId().value())
                     .name(dbJob.getName()).group(dbJob.getGroup()).jobType(dbJob.getJobType())
-                    .domainStatus(dbJob.getStatus().name()).cronExpression(dbJob.getCron().value());
+                    .domainStatus(dbJob.getStatus().name())
+                    .cronExpression(dbJob.getScheduleRule().getType() == ScheduleType.CRON ? dbJob.getScheduleRule().getCronExpression() : dbJob.getScheduleRule().getExecuteTime().toString());
 
             if (qView != null) {
                 builder.state(qView.getState()).nextFireTime(qView.getNextFireTime())
@@ -225,6 +274,23 @@ public class ScheduledJobApplicationService {
     }
 
     /**
+     * <h2>完成一次性排程任務</h2>
+     * <p>
+     * 當一次性任務執行完畢時，由全域監聽器呼叫，更新資料庫狀態為已完成。
+     * </p>
+     */
+    @Transactional
+    public void completeOneTimeJob(String name, String group) {
+        repository.findByNameAndGroup(name, group).ifPresent(job -> {
+            if (job.getScheduleRule() != null && job.getScheduleRule().isOneTime()) {
+                job.complete();
+                repository.save(job);
+                log.info("一次性任務執行完畢，狀態更新為 COMPLETED: {}.{}", group, name);
+            }
+        });
+    }
+
+    /**
      * 安全獲取 Quartz 運行數據。 當引擎發生通訊異常或資料庫鎖定時，回傳空清單以觸發降級邏輯。
      */
     private List<ScheduleJobView> getQuartzJobsSafe() {
@@ -234,5 +300,20 @@ public class ScheduledJobApplicationService {
             log.error("無法從 Quartz 取得狀態，啟動降級方案", e);
             return Collections.emptyList();
         }
+    }
+
+    /**
+     * 建立排程規則
+     */
+    private ScheduleRule createScheduleRule(String scheduleTypeStr, String cronExpression, java.time.LocalDateTime executeTime, String calendarKey) {
+        ScheduleType type = ScheduleType.valueOf(scheduleTypeStr);
+        if (type == ScheduleType.CRON) {
+            // 保留原本透過 Port 解析校驗的邏輯
+            cronParser.parse(cronExpression);
+            return ScheduleRule.cron(cronExpression, calendarKey);
+        } else if (type == ScheduleType.ONE_TIME) {
+            return ScheduleRule.oneTime(executeTime);
+        }
+        throw new IllegalArgumentException("不支援的排程類型: " + scheduleTypeStr);
     }
 }

@@ -6,6 +6,9 @@ import com.example.demo.application.shared.listener.JobStatusListener;
 
 import lombok.extern.slf4j.Slf4j;
 
+import lombok.RequiredArgsConstructor;
+import com.example.demo.application.service.ScheduledJobApplicationService;
+
 /**
  * <h2>全域排程任務監控監聽器</h2>
  * <p>
@@ -21,7 +24,10 @@ import lombok.extern.slf4j.Slf4j;
  */
 @Slf4j
 @Component
+@RequiredArgsConstructor
 public class GlobalJobListener implements JobStatusListener {
+
+	private final ScheduledJobApplicationService applicationService;
 
 	// 用於追蹤起始時間的線程安全容器，確保 Quartz 多執行緒併發執行時不會互相污染變數
 	private final ThreadLocal<Long> startTime = new ThreadLocal<>();
@@ -67,11 +73,14 @@ public class GlobalJobListener implements JobStatusListener {
 		Long start = startTime.get();
 		long duration = (start != null) ? (System.currentTimeMillis() - start) : 0;
 
+		// 如果 cron 為 null 代表為一次性排程。
 		if (exception != null) {
 			log.error("[排程監控] <<< 任務執行失敗: {}.{}, 耗時: {}ms, 錯誤: {}", jobGroup, jobName, duration,
 					exception.getMessage());
 		} else {
 			log.info("[排程監控] <<< 任務執行成功: {}.{}, 總耗時: {}ms", jobGroup, jobName, duration);
+			// 執行成功後，若是 ONE_TIME 任務則變更資料庫狀態
+			applicationService.completeOneTimeJob(jobName, jobGroup);
 		}
 
 		startTime.remove(); // 執行結束，務必清理 ThreadLocal 避免 Memory Leak

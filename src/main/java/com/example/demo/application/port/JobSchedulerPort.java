@@ -63,6 +63,14 @@ public interface JobSchedulerPort {
 	List<ScheduleJobView> findAll() throws SchedulerException;
 
 	/**
+	 * 將領域層的日曆同步至底層 Quartz 引擎
+	 * 
+	 * @param calendar 領域層的日曆聚合根
+	 * @throws SchedulerException 底層註冊失敗時拋出
+	 */
+	void syncCalendar(com.example.demo.application.domain.calendar.aggregate.ScheduleCalendar calendar) throws SchedulerException;
+
+	/**
 	 * 更新現有排程的 Cron 表達式。
 	 *
 	 * @param command 包含新的 Cron 資訊與任務標識的命令物件

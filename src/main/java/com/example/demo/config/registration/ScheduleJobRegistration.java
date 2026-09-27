@@ -2,7 +2,7 @@ package com.example.demo.config.registration;
 
 import com.example.demo.application.port.JobSchedulerPort;
 import com.example.demo.application.service.ScheduledJobApplicationService;
-import com.example.demo.application.shared.command.CreateJobCommand;
+import com.example.demo.application.shared.command.CreateCronJobCommand;
 import com.example.demo.infra.quartz.listener.global.GlobalJobListener;
 import com.example.demo.infra.quartz.listener.global.PersistJobLogListener;
 import com.example.demo.infra.quartz.listener.impl.MessagePrintJobListener;
@@ -74,8 +74,8 @@ public class ScheduleJobRegistration {
      * @param jobClass       Quartz Job 類型，對應 @Component 名稱
      */
     private void registerSystemJob(String jobName, String groupName, String cronExpression, String jobClass) {
-        CreateJobCommand command = new CreateJobCommand(jobName, groupName, cronExpression, jobClass);
-        applicationService.initializeTask(command);
+        CreateCronJobCommand command = new CreateCronJobCommand(jobName, groupName, jobClass, cronExpression, null);
+        applicationService.initializeCronTask(command);
     }
 
 }

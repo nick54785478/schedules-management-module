@@ -136,7 +136,23 @@ class JobSchedulerAdapter implements JobSchedulerPort {
 	}
 
 	/**
-	 * 更新指定任務的 Cron 表達式。
+	 * 將領域層的日曆同步至底層 Quartz 引擎
+	 */
+	@Override
+	public void syncCalendar(com.example.demo.application.domain.calendar.aggregate.ScheduleCalendar domainCalendar) throws SchedulerException {
+		org.quartz.impl.calendar.HolidayCalendar quartzCalendar = new org.quartz.impl.calendar.HolidayCalendar();
+		
+		for (java.time.LocalDate date : domainCalendar.getExcludedDates()) {
+			java.util.Date javaDate = java.util.Date.from(date.atStartOfDay(java.time.ZoneId.systemDefault()).toInstant());
+			quartzCalendar.addExcludedDate(javaDate);
+		}
+		
+		scheduler.addCalendar(domainCalendar.getKey(), quartzCalendar, true, true);
+		log.info("Quartz 排程處理完成 - 動作: 註冊/更新日曆, 識別碼: {}", domainCalendar.getKey());
+	}
+
+	/**
+	 * 更新指定任務的排程設定。
 	 * <p>
 	 * 透過重新啟動（Reschedule）機制，僅更換 Trigger 而不影響 JobDetail。
 	 * </p>
@@ -144,13 +160,29 @@ class JobSchedulerAdapter implements JobSchedulerPort {
 	@Override
 	public Date updateCron(UpdateJobCronCommand cmd) throws SchedulerException {
 		TriggerKey tk = TriggerKey.triggerKey(cmd.name() + "Trigger", cmd.group());
+		JobKey jk = JobKey.jobKey(cmd.name(), cmd.group());
 
-		// 重新構建新 Trigger 並綁定原 Job
-		CronTrigger newTrigger = TriggerBuilder.newTrigger().withIdentity(tk)
-				.withSchedule(CronScheduleBuilder.cronSchedule(cmd.newCron()))
-				.forJob(JobKey.jobKey(cmd.name(), cmd.group())).build();
+		TriggerBuilder<Trigger> triggerBuilder = TriggerBuilder.newTrigger().withIdentity(tk).forJob(jk);
 
-		return scheduler.rescheduleJob(tk, newTrigger);
+		// 如果新的指令有需要繼承日曆設定 (透過領域物件查詢，但 cmd 沒有日曆，所以這裡要從現有 job 找出 calendar)
+		// 但更簡單的是，我們已經將 Calendar 保存在 ScheduledJob 內了！不過 JobSchedulerAdapter 只有 UpdateJobCronCommand。
+		// 讓我們手動去抓現有的 Trigger 並繼承它的 Calendar
+		try {
+			Trigger oldTrigger = scheduler.getTrigger(tk);
+			if (oldTrigger != null && oldTrigger.getCalendarName() != null) {
+				triggerBuilder.modifiedByCalendar(oldTrigger.getCalendarName());
+			}
+		} catch (SchedulerException e) {
+			log.warn("無法獲取舊的 Trigger，將不繼承日曆設定", e);
+		}
+
+		if ("CRON".equals(cmd.scheduleType())) {
+			triggerBuilder.withSchedule(CronScheduleBuilder.cronSchedule(cmd.newCron()));
+		} else if ("ONE_TIME".equals(cmd.scheduleType())) {
+			triggerBuilder.startAt(Date.from(cmd.executeTime().atZone(java.time.ZoneId.systemDefault()).toInstant()));
+		}
+
+		return scheduler.rescheduleJob(tk, triggerBuilder.build());
 	}
 
 	/**
@@ -223,20 +255,33 @@ class JobSchedulerAdapter implements JobSchedulerPort {
 	/**
 	 * <h2>createTrigger</h2>
 	 * <p>
-	 * 建構基於 Cron 表達式的 {@link Trigger} 實例。 Trigger 用於描述任務的「時間規則」並綁定至特定的 Job。
+	 * 建構 {@link Trigger} 實例。根據不同的 ScheduleRule 來產生 CronTrigger 或 SimpleTrigger。
+	 * Trigger 用於描述任務的「時間規則」並綁定至特定的 Job。
 	 * </p>
 	 * 
 	 * <p>
 	 * 預設 Trigger 識別碼會自動補上 "Trigger" 字樣以與 Job 名稱區隔。
 	 * </p>
 	 *
-	 * @param cmd 包含 Cron 資訊與任務身分的註冊指令
-	 * @return 配置完成的 CronTrigger 物件
+	 * @param cmd 包含時間規則與任務身分的註冊指令
+	 * @return 配置完成的 Trigger 物件
 	 */
 	private Trigger createTrigger(RegisterJobCommand cmd) {
-		return TriggerBuilder.newTrigger().withIdentity(cmd.name() + "Trigger", cmd.group())
-				.withSchedule(CronScheduleBuilder.cronSchedule(cmd.cronExpression())).forJob(cmd.name(), cmd.group())
-				.build();
+		TriggerBuilder<Trigger> triggerBuilder = TriggerBuilder.newTrigger()
+				.withIdentity(cmd.name() + "Trigger", cmd.group())
+				.forJob(cmd.name(), cmd.group());
+
+		if (cmd.scheduleRule().getCalendarKey() != null && !cmd.scheduleRule().getCalendarKey().isBlank()) {
+			triggerBuilder.modifiedByCalendar(cmd.scheduleRule().getCalendarKey());
+		}
+
+		if (cmd.scheduleRule().isOneTime()) {
+			triggerBuilder.startAt(Date.from(cmd.scheduleRule().getExecuteTime().atZone(java.time.ZoneId.systemDefault()).toInstant()));
+		} else {
+			triggerBuilder.withSchedule(CronScheduleBuilder.cronSchedule(cmd.scheduleRule().getCronExpression()));
+		}
+
+		return triggerBuilder.build();
 	}
 
 	/**
