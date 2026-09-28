@@ -1,4 +1,4 @@
-package com.example.demo.infra.persistence;
+package com.example.demo.application.domain.distlock.repository;
 
 import java.time.Instant;
 

@@ -115,15 +115,6 @@ public class ScheduledJob {
     }
 
     /**
-     * 更新排程規則
-     *
-     * @param newRule 新的排程規則數值物件
-     */
-    public void updateScheduleRule(ScheduleRule newRule) {
-        this.scheduleRule = newRule;
-    }
-
-    /**
      * Private Constructor
      */
     private ScheduledJob(Long id, JobId jobId, String name, String group, String jobType, ScheduleRule scheduleRule,

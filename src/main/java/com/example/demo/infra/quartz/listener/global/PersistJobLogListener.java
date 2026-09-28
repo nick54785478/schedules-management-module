@@ -7,7 +7,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.example.demo.application.domain.joblog.aggregate.ScheduleJobLog;
 import com.example.demo.application.shared.listener.JobStatusListener;
-import com.example.demo.infra.persistence.ScheduleJobLogRepository;
+import com.example.demo.application.domain.joblog.repository.ScheduleJobLogRepository;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

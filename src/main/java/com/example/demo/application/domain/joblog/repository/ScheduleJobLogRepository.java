@@ -1,4 +1,4 @@
-package com.example.demo.infra.persistence;
+package com.example.demo.application.domain.joblog.repository;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;

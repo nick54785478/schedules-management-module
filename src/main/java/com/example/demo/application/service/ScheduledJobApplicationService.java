@@ -15,7 +15,7 @@ import com.example.demo.application.shared.exception.InvalidCronException;
 import com.example.demo.application.shared.exception.JobNotFoundException;
 import com.example.demo.application.shared.exception.ScheduleEngineException;
 import com.example.demo.application.shared.view.ScheduleJobView;
-import com.example.demo.infra.persistence.ScheduledJobRepository;
+import com.example.demo.application.domain.schedule.repository.ScheduledJobRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -129,7 +129,7 @@ public class ScheduledJobApplicationService {
         ScheduleRule newRule = createScheduleRule(command.scheduleType(), command.newCron(), command.executeTime(), existingCalendarKey);
 
         // 3. 領域聚合根更新狀態
-        job.updateScheduleRule(newRule);
+        job.changeSchedule(newRule);
 
         // 4. 同步至執行引擎
         try {
@@ -160,7 +160,7 @@ public class ScheduledJobApplicationService {
                 currentRule.getExecuteTime(), 
                 command.calendarKey());
 
-        job.updateScheduleRule(newRule);
+        job.changeSchedule(newRule);
 
         try {
             // 將更新後的 Trigger 重新註冊到 Quartz

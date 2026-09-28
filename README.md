@@ -32,6 +32,12 @@
 **3. 領域保護機制 (The Gatekeeper)**
 > 採用 純粹派 DDD 設計，透過 CronParserPort 攔截無效的 Cron 表達式，確保 ScheduledJob 聚合根在記憶體中始終處於合法狀態。
 
+**4. 務實的領域驅動設計 (Pragmatic DDD)**
+本專案在架構上採用了「務實的 DDD (Pragmatic DDD)」取捨，在保持核心領域模型嚴謹的同時，也兼顧了微服務開發的開發效率：
+>* **允許框架侵入 (JPA & Lombok)**：允許 JPA Annotation (`@Entity`, `@Table`) 與 Lombok 註解直接標記在領域模型 (Domain Model) 上。這省去了大量的 Mapper 與 Entity <-> Domain 轉換工本，大幅提升中小型專案的開發效率。
+>* **以功能切片 (Package by Feature)**：Domain Layer 內部依照功能切分子領域（如 `schedule`, `calendar`, `joblog`），將對應的 Aggregate Root 與 VO 收攏在一起，保持極高的模組內聚性。
+>* **領域防腐與封裝 (Encapsulation)**：即便引入了 Lombok，依然嚴格透過覆寫 Getter 回傳 `Collections.unmodifiableSet()` 來防止底層 Collection 被外部意外竄改；並且封閉 Setter，要求所有業務狀態的變更都必須透過具備防禦性設計的領域方法（如 `changeSchedule`）進行，拒絕退化為貧血模型 (Anemic Domain Model)。
+
 ## 開發者指南
 
 ### 建立一支排程工作的步驟

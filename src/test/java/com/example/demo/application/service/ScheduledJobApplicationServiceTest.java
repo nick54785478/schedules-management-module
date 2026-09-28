@@ -25,7 +25,7 @@ import com.example.demo.application.shared.command.RegisterJobCommand;
 import com.example.demo.application.shared.command.UpdateJobCronCommand;
 import com.example.demo.application.shared.exception.JobNotFoundException;
 import com.example.demo.application.shared.exception.ScheduleEngineException;
-import com.example.demo.infra.persistence.ScheduledJobRepository;
+import com.example.demo.application.domain.schedule.repository.ScheduledJobRepository;
 
 @ExtendWith(MockitoExtension.class)
 class ScheduledJobApplicationServiceTest {

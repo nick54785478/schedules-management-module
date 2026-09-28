@@ -15,12 +15,14 @@ import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.JdbcTypeCode;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
@@ -42,7 +44,7 @@ public class ScheduleCalendar {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
-    @org.hibernate.annotations.JdbcTypeCode(java.sql.Types.VARCHAR)
+    @JdbcTypeCode(java.sql.Types.VARCHAR)
     @Column(name = "id", updatable = false, nullable = false, length = 36)
     private UUID id;
 
@@ -94,5 +96,12 @@ public class ScheduleCalendar {
         if (date != null) {
             this.excludedDates.remove(date);
         }
+    }
+
+    /**
+     * 阻斷外部直接修改集合，確保只能透過業務方法異動
+     */
+    public Set<LocalDate> getExcludedDates() {
+        return Collections.unmodifiableSet(this.excludedDates);
     }
 }

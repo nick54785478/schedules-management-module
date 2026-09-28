@@ -1,4 +1,4 @@
-package com.example.demo.infra.persistence;
+package com.example.demo.application.domain.schedule.repository;
 
 import java.util.Optional;
 

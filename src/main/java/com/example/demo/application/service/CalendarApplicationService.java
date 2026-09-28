@@ -7,7 +7,7 @@ import com.example.demo.application.domain.calendar.aggregate.ScheduleCalendar;
 import com.example.demo.application.port.JobSchedulerPort;
 import com.example.demo.application.shared.command.AddExcludedDateCommand;
 import com.example.demo.application.shared.command.CreateCalendarCommand;
-import com.example.demo.infra.persistence.ScheduleCalendarRepository;
+import com.example.demo.application.domain.calendar.repository.ScheduleCalendarRepository;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
