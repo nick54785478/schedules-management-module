@@ -15,6 +15,10 @@ import lombok.extern.slf4j.Slf4j;
 import java.util.List;
 import java.util.Optional;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import com.example.demo.application.shared.view.PageGottenView;
+
 import java.util.UUID;
 
 @Slf4j
@@ -87,8 +91,15 @@ public class CalendarApplicationService {
      * 查詢所有日曆
      */
     @Transactional(readOnly = true)
-    public List<ScheduleCalendar> findAllCalendars() {
-        return repository.findAll();
+    public PageGottenView<ScheduleCalendar> findAllCalendars(int page, int size) {
+        Page<ScheduleCalendar> calendarPage = repository.findAll(PageRequest.of(page, size));
+        return new PageGottenView<>(
+                calendarPage.getContent(),
+                calendarPage.getNumber(),
+                calendarPage.getSize(),
+                calendarPage.getTotalElements(),
+                calendarPage.getTotalPages()
+        );
     }
 
     /**

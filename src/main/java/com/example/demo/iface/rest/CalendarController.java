@@ -4,6 +4,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import com.example.demo.application.shared.view.PageGottenView;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -12,6 +13,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.example.demo.application.service.CalendarApplicationService;
@@ -44,11 +46,23 @@ public class CalendarController {
 
     @Operation(summary = "查詢所有日曆", description = "列出系統內所有的日曆設定")
     @GetMapping
-    public ResponseEntity<List<String>> getAllCalendars() {
-        List<String> calendars = applicationService.findAllCalendars().stream()
+    public ResponseEntity<PageGottenView<String>> getAllCalendars(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        PageGottenView<com.example.demo.application.domain.calendar.aggregate.ScheduleCalendar> pagedCalendars = applicationService.findAllCalendars(page, size);
+        
+        List<String> calendars = pagedCalendars.content().stream()
                 .map(cal -> cal.getId() + " : " + cal.getKey() + " - " + cal.getDescription())
                 .collect(Collectors.toList());
-        return ResponseEntity.ok(calendars);
+                
+        PageGottenView<String> result = new PageGottenView<>(
+                calendars, 
+                pagedCalendars.pageNumber(), 
+                pagedCalendars.pageSize(), 
+                pagedCalendars.totalElements(), 
+                pagedCalendars.totalPages()
+        );
+        return ResponseEntity.ok(result);
     }
 
     @Operation(summary = "查詢單一日曆的所有排除日期", description = "根據日曆 ID 查詢其下所有設定的排除日期")

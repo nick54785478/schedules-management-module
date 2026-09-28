@@ -14,10 +14,13 @@ import com.example.demo.application.shared.command.UpdateJobCronCommand;
 import com.example.demo.application.shared.exception.InvalidCronException;
 import com.example.demo.application.shared.exception.JobNotFoundException;
 import com.example.demo.application.shared.exception.ScheduleEngineException;
+import com.example.demo.application.shared.view.PageGottenView;
 import com.example.demo.application.shared.view.ScheduleJobView;
 import com.example.demo.application.domain.schedule.repository.ScheduledJobRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -213,9 +216,10 @@ public class ScheduledJobApplicationService {
      *
      * @return 整合後的視圖清單，包含領域狀態與引擎即時狀態
      */
-    public List<ScheduleJobView> getJobInfoResources() {
-        // 1. 取得 Master Data (DB)
-        List<ScheduledJob> dbJobs = repository.findAll();
+    public PageGottenView<ScheduleJobView> getJobInfoResources(int page, int size) {
+        // 1. 取得 Master Data (DB) - 使用分頁
+        Page<ScheduledJob> dbJobsPage = repository.findAll(PageRequest.of(page, size));
+        List<ScheduledJob> dbJobs = dbJobsPage.getContent();
 
         // 2. 取得 Runtime Data (Quartz) - 具備 Try-Catch 降級保護
         List<ScheduleJobView> quartzJobs = getQuartzJobsSafe();
@@ -225,7 +229,7 @@ public class ScheduledJobApplicationService {
                 .collect(Collectors.toMap(j -> j.getName() + "-" + j.getGroup(), j -> j, (exist, replace) -> exist));
 
         // 4. 數據聚合
-        return dbJobs.stream().map(dbJob -> {
+        List<ScheduleJobView> viewList = dbJobs.stream().map(dbJob -> {
             String key = dbJob.getName() + "-" + dbJob.getGroup();
             ScheduleJobView qView = quartzMap.get(key);
 
@@ -247,6 +251,14 @@ public class ScheduledJobApplicationService {
 
             return builder.build();
         }).collect(Collectors.toList());
+
+        return new com.example.demo.application.shared.view.PageGottenView<>(
+                viewList,
+                dbJobsPage.getNumber(),
+                dbJobsPage.getSize(),
+                dbJobsPage.getTotalElements(),
+                dbJobsPage.getTotalPages()
+        );
     }
 
     /**
