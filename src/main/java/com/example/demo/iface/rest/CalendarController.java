@@ -21,6 +21,9 @@ import com.example.demo.application.shared.command.AddExcludedDateCommand;
 import com.example.demo.application.shared.command.CreateCalendarCommand;
 import com.example.demo.iface.dto.req.AddExcludedDateResource;
 import com.example.demo.iface.dto.req.CreateCalendarResource;
+import com.example.demo.iface.dto.res.CalendarCreatedResource;
+import com.example.demo.iface.dto.res.HolidayAddedResource;
+import com.example.demo.iface.dto.res.HolidayRemovedResource;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -38,10 +41,10 @@ public class CalendarController {
 
     @Operation(summary = "建立新日曆", description = "建立一個全新的全域日曆黑名單")
     @PostMapping
-    public ResponseEntity<String> createCalendar(@RequestBody CreateCalendarResource request) {
+    public ResponseEntity<CalendarCreatedResource> createCalendar(@RequestBody CreateCalendarResource request) {
         CreateCalendarCommand command = new CreateCalendarCommand(request.key(), request.description());
         applicationService.createCalendar(command);
-        return new ResponseEntity<>("日曆建立成功", HttpStatus.CREATED);
+        return new ResponseEntity<>(new CalendarCreatedResource("201", "日曆建立成功"), HttpStatus.CREATED);
     }
 
     @Operation(summary = "查詢所有日曆", description = "列出系統內所有的日曆設定")
@@ -76,16 +79,16 @@ public class CalendarController {
 
     @Operation(summary = "新增排除日期", description = "為指定的日曆新增一天例外假日")
     @PostMapping("/{id}/holidays")
-    public ResponseEntity<String> addHoliday(@PathVariable("id") UUID id, @RequestBody AddExcludedDateResource request) {
+    public ResponseEntity<HolidayAddedResource> addHoliday(@PathVariable("id") UUID id, @RequestBody AddExcludedDateResource request) {
         AddExcludedDateCommand command = new AddExcludedDateCommand(id, request.date());
         applicationService.addExcludedDate(command);
-        return ResponseEntity.ok("假日新增成功");
+        return ResponseEntity.ok(new HolidayAddedResource("200", "假日新增成功"));
     }
 
     @Operation(summary = "刪除排除日期", description = "將特定日期從黑名單中移除 (例如: 補班日)")
     @DeleteMapping("/{id}/holidays/{date}")
-    public ResponseEntity<String> removeHoliday(@PathVariable("id") UUID id, @PathVariable("date") LocalDate date) {
+    public ResponseEntity<HolidayRemovedResource> removeHoliday(@PathVariable("id") UUID id, @PathVariable("date") LocalDate date) {
         applicationService.removeExcludedDate(id, date);
-        return ResponseEntity.ok("假日移除成功");
+        return ResponseEntity.ok(new HolidayRemovedResource("200", "假日移除成功"));
     }
 }
