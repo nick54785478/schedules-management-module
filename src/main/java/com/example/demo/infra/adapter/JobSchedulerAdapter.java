@@ -17,6 +17,8 @@ import org.quartz.JobKey;
 import org.quartz.JobListener;
 import org.quartz.Scheduler;
 import org.quartz.SchedulerException;
+import com.example.demo.application.shared.exception.CalendarSyncException;
+import com.example.demo.application.shared.exception.ScheduleEngineException;
 import org.quartz.SimpleTrigger;
 import org.quartz.Trigger;
 import org.quartz.TriggerBuilder;
@@ -66,36 +68,52 @@ class JobSchedulerAdapter implements JobSchedulerPort {
 	 * </p>
 	 */
 	@Override
-	public void add(RegisterJobCommand cmd) throws SchedulerException {
-		// 1. 動態解析 Job 類別 (基於 Spring Bean Name)
-		Class<? extends Job> jobClass = lookupJobClass(cmd.jobType());
-
-		// 2. 構建 Quartz 核心物件 (JobDetail 與 Trigger)
-		JobDetail jobDetail = createJobDetail(cmd, jobClass);
-		Trigger trigger = createTrigger(cmd);
-
-		// 3. 註冊至調度器 (replace=true 代表「存在即覆蓋」)
-		scheduler.scheduleJob(jobDetail, Collections.singleton(trigger), true);
-
-		log.info("Quartz 排程處理完成 - 動作: 註冊/更新, 識別碼: {}.{}", cmd.group(), cmd.name());
+	public void add(RegisterJobCommand cmd) {
+		try {
+			// 1. 動態解析 Job 類別 (基於 Spring Bean Name)
+			Class<? extends Job> jobClass = lookupJobClass(cmd.jobType());
+	
+			// 2. 構建 Quartz 核心物件 (JobDetail 與 Trigger)
+			JobDetail jobDetail = createJobDetail(cmd, jobClass);
+			Trigger trigger = createTrigger(cmd);
+	
+			// 3. 註冊至調度器 (replace=true 代表「存在即覆蓋」)
+			scheduler.scheduleJob(jobDetail, Collections.singleton(trigger), true);
+	
+			log.info("Quartz 排程處理完成 - 動作: 註冊/更新, 識別碼: {}.{}", cmd.group(), cmd.name());
+		} catch (SchedulerException e) {
+			throw new ScheduleEngineException("ADD", cmd.group(), cmd.name(), e);
+		}
 	}
 
 	@Override
-	public void delete(String name, String group) throws SchedulerException {
-		scheduler.deleteJob(JobKey.jobKey(name, group));
-		log.info("Quartz 排程處理完成 - 動作: 刪除, 識別碼: {}.{}", group, name);
+	public void delete(String name, String group) {
+		try {
+			scheduler.deleteJob(JobKey.jobKey(name, group));
+			log.info("Quartz 排程處理完成 - 動作: 刪除, 識別碼: {}.{}", group, name);
+		} catch (SchedulerException e) {
+			throw new ScheduleEngineException("DELETE", group, name, e);
+		}
 	}
 
 	@Override
-	public void pause(String name, String group) throws SchedulerException {
-		scheduler.pauseJob(JobKey.jobKey(name, group));
-		log.info("Quartz 排程處理完成 - 動作: 暫停, 識別碼: {}.{}", group, name);
+	public void pause(String name, String group) {
+		try {
+			scheduler.pauseJob(JobKey.jobKey(name, group));
+			log.info("Quartz 排程處理完成 - 動作: 暫停, 識別碼: {}.{}", group, name);
+		} catch (SchedulerException e) {
+			throw new ScheduleEngineException("PAUSE", group, name, e);
+		}
 	}
 
 	@Override
-	public void resume(String name, String group) throws SchedulerException {
-		scheduler.resumeJob(JobKey.jobKey(name, group));
-		log.info("Quartz 排程處理完成 - 動作: 恢復, 識別碼: {}.{}", group, name);
+	public void resume(String name, String group) {
+		try {
+			scheduler.resumeJob(JobKey.jobKey(name, group));
+			log.info("Quartz 排程處理完成 - 動作: 恢復, 識別碼: {}.{}", group, name);
+		} catch (SchedulerException e) {
+			throw new ScheduleEngineException("RESUME", group, name, e);
+		}
 	}
 
 	/**
@@ -106,49 +124,57 @@ class JobSchedulerAdapter implements JobSchedulerPort {
 	 * </p>
 	 */
 	@Override
-	public List<ScheduleJobView> findAll() throws SchedulerException {
-		List<ScheduleJobView> jobList = new ArrayList<>();
-
-		// 獲取所有群組中的所有 JobKey
-		Set<JobKey> jobKeys = scheduler.getJobKeys(GroupMatcher.anyJobGroup());
-		log.debug("掃描 Scheduler 運行狀態，當前 Job 總數: {}", jobKeys.size());
-
-		for (JobKey jobKey : jobKeys) {
-			List<? extends Trigger> triggers = scheduler.getTriggersOfJob(jobKey);
-
-			if (triggers.isEmpty()) {
-				log.warn("檢測到孤兒 Job (無 Trigger 綁定): {}", jobKey);
-				continue;
+	public List<ScheduleJobView> findAll() {
+		try {
+			List<ScheduleJobView> jobList = new ArrayList<>();
+	
+			// 獲取所有群組中的所有 JobKey
+			Set<JobKey> jobKeys = scheduler.getJobKeys(GroupMatcher.anyJobGroup());
+			log.debug("掃描 Scheduler 運行狀態，當前 Job 總數: {}", jobKeys.size());
+	
+			for (JobKey jobKey : jobKeys) {
+				List<? extends Trigger> triggers = scheduler.getTriggersOfJob(jobKey);
+	
+				if (triggers.isEmpty()) {
+					log.warn("檢測到孤兒 Job (無 Trigger 綁定): {}", jobKey);
+					continue;
+				}
+	
+				for (Trigger trigger : triggers) {
+					// 構建基礎運行時資訊
+					ScheduleJobView jobInfo = ScheduleJobView.builder().name(jobKey.getName()).group(jobKey.getGroup())
+							.nextFireTime(trigger.getNextFireTime())
+							.state(scheduler.getTriggerState(trigger.getKey()).name()).build();
+	
+					// 解析特定的 Trigger 詳細數據 (Cron 或 Interval)
+					this.processTriggerData(jobInfo, trigger);
+					jobList.add(jobInfo);
+				}
 			}
-
-			for (Trigger trigger : triggers) {
-				// 構建基礎運行時資訊
-				ScheduleJobView jobInfo = ScheduleJobView.builder().name(jobKey.getName()).group(jobKey.getGroup())
-						.nextFireTime(trigger.getNextFireTime())
-						.state(scheduler.getTriggerState(trigger.getKey()).name()).build();
-
-				// 解析特定的 Trigger 詳細數據 (Cron 或 Interval)
-				this.processTriggerData(jobInfo, trigger);
-				jobList.add(jobInfo);
-			}
+			return jobList;
+		} catch (SchedulerException e) {
+			throw new ScheduleEngineException("FIND_ALL", "SYSTEM", "ALL", e);
 		}
-		return jobList;
 	}
 
 	/**
 	 * 將領域層的日曆同步至底層 Quartz 引擎
 	 */
 	@Override
-	public void syncCalendar(com.example.demo.application.domain.calendar.aggregate.ScheduleCalendar domainCalendar) throws SchedulerException {
-		org.quartz.impl.calendar.HolidayCalendar quartzCalendar = new org.quartz.impl.calendar.HolidayCalendar();
-		
-		for (java.time.LocalDate date : domainCalendar.getExcludedDates()) {
-			java.util.Date javaDate = java.util.Date.from(date.atStartOfDay(java.time.ZoneId.systemDefault()).toInstant());
-			quartzCalendar.addExcludedDate(javaDate);
+	public void syncCalendar(com.example.demo.application.domain.calendar.aggregate.ScheduleCalendar domainCalendar) {
+		try {
+			org.quartz.impl.calendar.HolidayCalendar quartzCalendar = new org.quartz.impl.calendar.HolidayCalendar();
+			
+			for (java.time.LocalDate date : domainCalendar.getExcludedDates()) {
+				java.util.Date javaDate = java.util.Date.from(date.atStartOfDay(java.time.ZoneId.systemDefault()).toInstant());
+				quartzCalendar.addExcludedDate(javaDate);
+			}
+			
+			scheduler.addCalendar(domainCalendar.getKey(), quartzCalendar, true, true);
+			log.info("Quartz 排程處理完成 - 動作: 註冊/更新日曆, 識別碼: {}", domainCalendar.getKey());
+		} catch (SchedulerException e) {
+			throw new CalendarSyncException(domainCalendar.getKey(), e);
 		}
-		
-		scheduler.addCalendar(domainCalendar.getKey(), quartzCalendar, true, true);
-		log.info("Quartz 排程處理完成 - 動作: 註冊/更新日曆, 識別碼: {}", domainCalendar.getKey());
 	}
 
 	/**
@@ -158,31 +184,35 @@ class JobSchedulerAdapter implements JobSchedulerPort {
 	 * </p>
 	 */
 	@Override
-	public Date updateCron(UpdateJobCronCommand cmd) throws SchedulerException {
-		TriggerKey tk = TriggerKey.triggerKey(cmd.name() + "Trigger", cmd.group());
-		JobKey jk = JobKey.jobKey(cmd.name(), cmd.group());
-
-		TriggerBuilder<Trigger> triggerBuilder = TriggerBuilder.newTrigger().withIdentity(tk).forJob(jk);
-
-		// 如果新的指令有需要繼承日曆設定 (透過領域物件查詢，但 cmd 沒有日曆，所以這裡要從現有 job 找出 calendar)
-		// 但更簡單的是，我們已經將 Calendar 保存在 ScheduledJob 內了！不過 JobSchedulerAdapter 只有 UpdateJobCronCommand。
-		// 讓我們手動去抓現有的 Trigger 並繼承它的 Calendar
+	public Date updateCron(UpdateJobCronCommand cmd) {
 		try {
-			Trigger oldTrigger = scheduler.getTrigger(tk);
-			if (oldTrigger != null && oldTrigger.getCalendarName() != null) {
-				triggerBuilder.modifiedByCalendar(oldTrigger.getCalendarName());
+			TriggerKey tk = TriggerKey.triggerKey(cmd.name() + "Trigger", cmd.group());
+			JobKey jk = JobKey.jobKey(cmd.name(), cmd.group());
+	
+			TriggerBuilder<Trigger> triggerBuilder = TriggerBuilder.newTrigger().withIdentity(tk).forJob(jk);
+	
+			// 如果新的指令有需要繼承日曆設定 (透過領域物件查詢，但 cmd 沒有日曆，所以這裡要從現有 job 找出 calendar)
+			// 但更簡單的是，我們已經將 Calendar 保存在 ScheduledJob 內了！不過 JobSchedulerAdapter 只有 UpdateJobCronCommand。
+			// 讓我們手動去抓現有的 Trigger 並繼承它的 Calendar
+			try {
+				Trigger oldTrigger = scheduler.getTrigger(tk);
+				if (oldTrigger != null && oldTrigger.getCalendarName() != null) {
+					triggerBuilder.modifiedByCalendar(oldTrigger.getCalendarName());
+				}
+			} catch (SchedulerException e) {
+				log.warn("無法獲取舊的 Trigger，將不繼承日曆設定", e);
 			}
+	
+			if ("CRON".equals(cmd.scheduleType())) {
+				triggerBuilder.withSchedule(CronScheduleBuilder.cronSchedule(cmd.newCron()));
+			} else if ("ONE_TIME".equals(cmd.scheduleType())) {
+				triggerBuilder.startAt(Date.from(cmd.executeTime().atZone(java.time.ZoneId.systemDefault()).toInstant()));
+			}
+	
+			return scheduler.rescheduleJob(tk, triggerBuilder.build());
 		} catch (SchedulerException e) {
-			log.warn("無法獲取舊的 Trigger，將不繼承日曆設定", e);
+			throw new ScheduleEngineException("UPDATE_CRON", cmd.group(), cmd.name(), e);
 		}
-
-		if ("CRON".equals(cmd.scheduleType())) {
-			triggerBuilder.withSchedule(CronScheduleBuilder.cronSchedule(cmd.newCron()));
-		} else if ("ONE_TIME".equals(cmd.scheduleType())) {
-			triggerBuilder.startAt(Date.from(cmd.executeTime().atZone(java.time.ZoneId.systemDefault()).toInstant()));
-		}
-
-		return scheduler.rescheduleJob(tk, triggerBuilder.build());
 	}
 
 	/**
@@ -292,14 +322,18 @@ class JobSchedulerAdapter implements JobSchedulerPort {
 	 * </p>
 	 */
 	@Override
-	public void registerGlobalListener(JobStatusListener domainListener) throws SchedulerException {
-		// 呼叫統一的包裝方法，確保所有事件生命週期 (Starting, Vetoed, Executed) 都能被捕捉
-		JobListener quartzListener = this.wrapListener(domainListener);
-
-		scheduler.getListenerManager().addJobListener(quartzListener,
-				org.quartz.impl.matchers.EverythingMatcher.allJobs());
-
-		log.info("已完成全域監聽器註冊: {}", domainListener.getName());
+	public void registerGlobalListener(JobStatusListener domainListener) {
+		try {
+			// 呼叫統一的包裝方法，確保所有事件生命週期 (Starting, Vetoed, Executed) 都能被捕捉
+			JobListener quartzListener = this.wrapListener(domainListener);
+	
+			scheduler.getListenerManager().addJobListener(quartzListener,
+					org.quartz.impl.matchers.EverythingMatcher.allJobs());
+	
+			log.info("已完成全域監聽器註冊: {}", domainListener.getName());
+		} catch (SchedulerException e) {
+			throw new ScheduleEngineException("REGISTER_GLOBAL_LISTENER", "SYSTEM", "GLOBAL", e);
+		}
 	}
 
 	/**
@@ -309,15 +343,18 @@ class JobSchedulerAdapter implements JobSchedulerPort {
 	 * </p>
 	 */
 	@Override
-	public void registerJobListener(JobStatusListener listener, String jobName, String jobGroup)
-			throws SchedulerException {
-		JobKey jobKey = JobKey.jobKey(jobName, jobGroup);
-		JobListener quartzListener = this.wrapListener(listener);
-
-		scheduler.getListenerManager().addJobListener(quartzListener,
-				org.quartz.impl.matchers.KeyMatcher.keyEquals(jobKey));
-
-		log.info("已完成特定任務監聽器註冊: {}.{} -> {}", jobGroup, jobName, listener.getName());
+	public void registerJobListener(JobStatusListener listener, String jobName, String jobGroup) {
+		try {
+			JobKey jobKey = JobKey.jobKey(jobName, jobGroup);
+			JobListener quartzListener = this.wrapListener(listener);
+	
+			scheduler.getListenerManager().addJobListener(quartzListener,
+					org.quartz.impl.matchers.KeyMatcher.keyEquals(jobKey));
+	
+			log.info("已完成特定任務監聽器註冊: {}.{} -> {}", jobGroup, jobName, listener.getName());
+		} catch (SchedulerException e) {
+			throw new ScheduleEngineException("REGISTER_JOB_LISTENER", jobGroup, jobName, e);
+		}
 	}
 
 	/**

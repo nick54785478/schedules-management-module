@@ -9,6 +9,7 @@ import com.example.demo.application.port.CronParserPort;
 import com.example.demo.application.shared.exception.InvalidCronException;
 import com.example.demo.application.shared.exception.JobNotFoundException;
 import com.example.demo.application.shared.exception.ScheduleEngineException;
+import com.example.demo.application.shared.exception.CalendarSyncException;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -77,6 +78,22 @@ public class GlobalExceptionHandler {
 		// 紀錄詳細的堆疊資訊，協助運維人員定位是資料庫鎖死還是 Quartz 內部錯誤
 		log.error("[API 異常] 排程引擎操作發生非預期故障: ", e);
 		return new ErrorResponse("ENGINE_ERROR", e.getMessage());
+	}
+
+	/**
+	 * 處理日曆同步技術故障 (HTTP 500)。
+	 * <p>
+	 * 適用情境：當 Quartz 引擎註冊或更新日曆設定失敗時。
+	 * </p>
+	 * 
+	 * @param e {@link CalendarSyncException}
+	 * @return 錯誤響應
+	 */
+	@ExceptionHandler(CalendarSyncException.class)
+	@ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
+	public ErrorResponse handleCalendarSyncError(CalendarSyncException e) {
+		log.error("[API 異常] 日曆同步發生非預期故障: ", e);
+		return new ErrorResponse("CALENDAR_SYNC_ERROR", e.getMessage());
 	}
 
 	/**

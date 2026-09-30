@@ -41,12 +41,7 @@ public class CalendarApplicationService {
         ScheduleCalendar calendar = ScheduleCalendar.create(command.key(), command.description());
         repository.save(calendar);
 
-        try {
-            jobScheduler.syncCalendar(calendar);
-        } catch (Exception e) {
-            log.error("同步日曆至 Quartz 失敗: {}", command.key(), e);
-            throw new RuntimeException("系統日曆建立失敗", e);
-        }
+        jobScheduler.syncCalendar(calendar);
     }
 
     /**
@@ -60,12 +55,7 @@ public class CalendarApplicationService {
         calendar.addExcludedDate(command.excludedDate());
         repository.save(calendar);
 
-        try {
-            jobScheduler.syncCalendar(calendar); // 更新 Quartz 內的日曆
-        } catch (Exception e) {
-            log.error("同步更新日曆至 Quartz 失敗: {}", calendar.getKey(), e);
-            throw new RuntimeException("系統日曆更新失敗", e);
-        }
+        jobScheduler.syncCalendar(calendar); // 更新 Quartz 內的日曆
     }
 
     /**
@@ -79,12 +69,7 @@ public class CalendarApplicationService {
         calendar.removeExcludedDate(date);
         repository.save(calendar);
 
-        try {
-            jobScheduler.syncCalendar(calendar); // 更新 Quartz 內的日曆
-        } catch (Exception e) {
-            log.error("同步更新日曆至 Quartz 失敗: {}", calendar.getKey(), e);
-            throw new RuntimeException("系統日曆更新失敗", e);
-        }
+        jobScheduler.syncCalendar(calendar); // 更新 Quartz 內的日曆
     }
 
     /**

@@ -71,15 +71,10 @@ public class ScheduledJobApplicationService {
             log.info("排程配置已存在，準備執行引擎同步: {}", command.name());
         }
 
-        try {
-            ScheduleRule ruleToRegister = createScheduleRule(ScheduleType.CRON.name(), command.cronExpression(), null, command.calendarKey());
-            RegisterJobCommand registerJobCommand = new RegisterJobCommand(command.name(),
-                    command.group(), ruleToRegister, command.jobType());
-            jobScheduler.add(registerJobCommand);
-        } catch (Exception e) {
-            log.error("Quartz 引擎註冊失敗: {}.{}", command.group(), command.name(), e);
-            throw new RuntimeException("系統排程初始化失敗", e);
-        }
+        ScheduleRule ruleToRegister = createScheduleRule(ScheduleType.CRON.name(), command.cronExpression(), null, command.calendarKey());
+        RegisterJobCommand registerJobCommand = new RegisterJobCommand(command.name(),
+                command.group(), ruleToRegister, command.jobType());
+        jobScheduler.add(registerJobCommand);
     }
 
     /**
@@ -99,15 +94,10 @@ public class ScheduledJobApplicationService {
             log.info("排程配置已存在，準備執行引擎同步: {}", command.name());
         }
 
-        try {
-            ScheduleRule ruleToRegister = createScheduleRule(ScheduleType.ONE_TIME.name(), null, command.executeTime(), null);
-            RegisterJobCommand registerJobCommand = new RegisterJobCommand(command.name(),
-                    command.group(), ruleToRegister, command.jobType());
-            jobScheduler.add(registerJobCommand);
-        } catch (Exception e) {
-            log.error("Quartz 引擎註冊失敗: {}.{}", command.group(), command.name(), e);
-            throw new RuntimeException("系統排程初始化失敗", e);
-        }
+        ScheduleRule ruleToRegister = createScheduleRule(ScheduleType.ONE_TIME.name(), null, command.executeTime(), null);
+        RegisterJobCommand registerJobCommand = new RegisterJobCommand(command.name(),
+                command.group(), ruleToRegister, command.jobType());
+        jobScheduler.add(registerJobCommand);
     }
 
     /**
@@ -135,14 +125,10 @@ public class ScheduledJobApplicationService {
         job.changeSchedule(newRule);
 
         // 4. 同步至執行引擎
-        try {
-            // 使用 RegisterJobCommand (因為 JobSchedulerAdapter.add() 的 replace=true 會覆寫 Trigger，也能正確帶入最新的 rule)
-            RegisterJobCommand registerJobCommand = new RegisterJobCommand(job.getName(),
-                    job.getGroup(), job.getScheduleRule(), job.getJobType());
-            jobScheduler.add(registerJobCommand);
-        } catch (Exception e) {
-            throw new ScheduleEngineException("UPDATE_CRON", job.getName(), e);
-        }
+        // 使用 RegisterJobCommand (因為 JobSchedulerAdapter.add() 的 replace=true 會覆寫 Trigger，也能正確帶入最新的 rule)
+        RegisterJobCommand registerJobCommand = new RegisterJobCommand(job.getName(),
+                job.getGroup(), job.getScheduleRule(), job.getJobType());
+        jobScheduler.add(registerJobCommand);
 
         // 5. 保存業務狀態
         repository.save(job);
@@ -165,14 +151,10 @@ public class ScheduledJobApplicationService {
 
         job.changeSchedule(newRule);
 
-        try {
-            // 將更新後的 Trigger 重新註冊到 Quartz
-            RegisterJobCommand registerJobCommand = new RegisterJobCommand(job.getName(),
-                    job.getGroup(), job.getScheduleRule(), job.getJobType());
-            jobScheduler.add(registerJobCommand);
-        } catch (Exception e) {
-            throw new ScheduleEngineException("BIND_CALENDAR", job.getName(), e);
-        }
+        // 將更新後的 Trigger 重新註冊到 Quartz
+        RegisterJobCommand registerJobCommand = new RegisterJobCommand(job.getName(),
+                job.getGroup(), job.getScheduleRule(), job.getJobType());
+        jobScheduler.add(registerJobCommand);
 
         repository.save(job);
         log.info("任務日曆綁定更新成功: {}.{}", job.getGroup(), job.getName());
@@ -194,11 +176,7 @@ public class ScheduledJobApplicationService {
 
         job.pause();
 
-        try {
-            jobScheduler.pause(job.getName(), job.getGroup());
-        } catch (Exception e) {
-            throw new ScheduleEngineException("PAUSE", job.getName(), e);
-        }
+        jobScheduler.pause(job.getName(), job.getGroup());
 
         repository.save(job);
         log.info("任務暫停成功: {}.{}", job.getGroup(), job.getName());
@@ -275,11 +253,7 @@ public class ScheduledJobApplicationService {
 
         job.resume();
 
-        try {
-            jobScheduler.resume(job.getName(), job.getGroup());
-        } catch (Exception e) {
-            throw new ScheduleEngineException("RESUME", job.getName(), e);
-        }
+        jobScheduler.resume(job.getName(), job.getGroup());
 
         repository.save(job);
         log.info("任務恢復成功: {}", job.getName());
@@ -308,7 +282,7 @@ public class ScheduledJobApplicationService {
     private List<ScheduleJobView> getQuartzJobsSafe() {
         try {
             return jobScheduler.findAll();
-        } catch (Exception e) {
+        } catch (ScheduleEngineException e) {
             log.error("無法從 Quartz 取得狀態，啟動降級方案", e);
             return Collections.emptyList();
         }
