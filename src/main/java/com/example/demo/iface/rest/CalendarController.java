@@ -49,22 +49,10 @@ public class CalendarController {
 
     @Operation(summary = "查詢所有日曆", description = "列出系統內所有的日曆設定")
     @GetMapping
-    public ResponseEntity<PageGottenView<String>> getAllCalendars(
+    public ResponseEntity<PageGottenView<com.example.demo.application.shared.view.ScheduleCalendarView>> getAllCalendars(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
-        PageGottenView<com.example.demo.application.domain.calendar.aggregate.ScheduleCalendar> pagedCalendars = applicationService.findAllCalendars(page, size);
-        
-        List<String> calendars = pagedCalendars.content().stream()
-                .map(cal -> cal.getId() + " : " + cal.getKey() + " - " + cal.getDescription())
-                .collect(Collectors.toList());
-                
-        PageGottenView<String> result = new PageGottenView<>(
-                calendars, 
-                pagedCalendars.pageNumber(), 
-                pagedCalendars.pageSize(), 
-                pagedCalendars.totalElements(), 
-                pagedCalendars.totalPages()
-        );
+        PageGottenView<com.example.demo.application.shared.view.ScheduleCalendarView> result = applicationService.findAllCalendars(page, size);
         return ResponseEntity.ok(result);
     }
 
@@ -72,7 +60,7 @@ public class CalendarController {
     @GetMapping("/{id}/holidays")
     public ResponseEntity<List<LocalDate>> getCalendarHolidays(@PathVariable("id") UUID id) {
         List<LocalDate> dates = applicationService.findCalendarById(id)
-                .map(cal -> cal.getExcludedDates().stream().collect(Collectors.toList()))
+                .map(cal -> cal.excludedDates().stream().collect(Collectors.toList()))
                 .orElseThrow(() -> new IllegalArgumentException("找不到該日曆 ID: " + id));
         return ResponseEntity.ok(dates);
     }

@@ -20,6 +20,9 @@ import org.springframework.data.domain.PageRequest;
 import com.example.demo.application.shared.view.PageGottenView;
 
 import java.util.UUID;
+import java.util.stream.Collectors;
+
+import com.example.demo.application.shared.view.ScheduleCalendarView;
 
 @Slf4j
 @Service
@@ -76,10 +79,14 @@ public class CalendarApplicationService {
      * 查詢所有日曆
      */
     @Transactional(readOnly = true)
-    public PageGottenView<ScheduleCalendar> findAllCalendars(int page, int size) {
+    public PageGottenView<ScheduleCalendarView> findAllCalendars(int page, int size) {
         Page<ScheduleCalendar> calendarPage = repository.findAll(PageRequest.of(page, size));
+        var viewList = calendarPage.getContent().stream()
+                .map(cal -> new ScheduleCalendarView(cal.getId(), cal.getKey(), cal.getDescription(), cal.getExcludedDates()))
+                .collect(Collectors.toList());
+                
         return new PageGottenView<>(
-                calendarPage.getContent(),
+                viewList,
                 calendarPage.getNumber(),
                 calendarPage.getSize(),
                 calendarPage.getTotalElements(),
@@ -91,7 +98,8 @@ public class CalendarApplicationService {
      * 查詢單一日曆
      */
     @Transactional(readOnly = true)
-    public Optional<ScheduleCalendar> findCalendarById(UUID id) {
-        return repository.findById(id);
+    public Optional<ScheduleCalendarView> findCalendarById(UUID id) {
+        return repository.findById(id)
+                .map(cal -> new ScheduleCalendarView(cal.getId(), cal.getKey(), cal.getDescription(), cal.getExcludedDates()));
     }
 }
