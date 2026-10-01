@@ -68,6 +68,30 @@ Quartz 的 Failover（故障移轉）機制本質上是一種「基於資料庫�
 
 ---
 
+### 決定任務生死的關鍵屬性：RequestsRecovery
+
+當 Node B 把幽靈任務清理並重置後，這個任務「到底會不會立刻重新執行」，完全取決於開發者在宣告 `JobDetail` 時的一個關鍵屬性：`RequestsRecovery`。
+
+#### 1. 當 RequestsRecovery = false（預設值）
+- **行為**：Quartz 叢集只會把 Trigger 狀態改回 `WAITING`，然後什麼都不做。
+- **結果**：這一次的執行就這樣憑空消失了。系統會乖乖等待下一次 Cron 時間到達，才會再次觸發。
+- **適用場景**：高頻率、允許單次遺漏的任務（例如：每 1 分鐘同步一次快取、每 5 秒更新一次儀表板）。
+
+#### 2. 當 RequestsRecovery = true
+- **行為**：Node B 會立刻為這個任務生成一個「恢復型 Trigger」，並由當下搶到鎖的活體節點（可能是 Node B，也可能是 Node C）立刻啟動執行。
+- **結果**：任務不會被遺漏，叢集保證它一定會被執行完畢。在傳入的 `JobExecutionContext` 中，`isRecovering()` 會回傳 `true`，讓程式碼知道這是一次「災後補跑」。
+- **適用場景**：涉及金流、核心交易、絕對不能漏掉任何一次的關鍵批次（例如：每日凌晨 2 點的日結算報表）。
+
+**Java 宣告方式**：
+```java
+JobDetail job = JobBuilder.newJob(MyJob.class)
+    .withIdentity("myJob", "group1")
+    .requestRecovery(true) // 啟用災後重建
+    .build();
+```
+
+---
+
 ### 實務上必須防範的邊界問題（Pitfalls）
 
 雖然 Quartz 的 Failover 邏輯很嚴謹，但底層設計有幾處實務邊界情況需要特別防護：
