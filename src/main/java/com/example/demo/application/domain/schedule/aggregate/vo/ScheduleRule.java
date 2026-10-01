@@ -59,14 +59,21 @@ public class ScheduleRule {
     private String calendarKey;
 
     /**
+     * 是否啟用災後重跑 (Failover Recovery)
+     */
+    @Column(name = "requests_recovery", nullable = false)
+    private boolean requestsRecovery;
+
+    /**
      * 靜態工廠方法：建立一個基於 Cron 表達式的排程規則，不綁定日曆。
      * 
      * @param cron 合法的 Cron 字串
+     * @param requestsRecovery 是否啟用災後重跑
      * @return 封裝了 Cron 的排程規則
      * @throws NullPointerException 若 cron 為 null
      */
-    public static ScheduleRule cron(String cron) {
-        return cron(cron, null);
+    public static ScheduleRule cron(String cron, boolean requestsRecovery) {
+        return cron(cron, null, requestsRecovery);
     }
 
     /**
@@ -74,15 +81,17 @@ public class ScheduleRule {
      * 
      * @param cron 合法的 Cron 字串
      * @param calendarKey 日曆 key (允許為 null)
+     * @param requestsRecovery 是否啟用災後重跑
      * @return 封裝了 Cron 與日曆的排程規則
      * @throws NullPointerException 若 cron 為 null
      */
-    public static ScheduleRule cron(String cron, String calendarKey) {
+    public static ScheduleRule cron(String cron, String calendarKey, boolean requestsRecovery) {
         Objects.requireNonNull(cron, "Cron expression cannot be null");
         ScheduleRule rule = new ScheduleRule();
         rule.type = ScheduleType.CRON;
         rule.cronExpression = cron;
         rule.calendarKey = calendarKey;
+        rule.requestsRecovery = requestsRecovery;
         return rule;
     }
 
@@ -90,11 +99,12 @@ public class ScheduleRule {
      * 靜態工廠方法：建立一個一次性的排程規則。
      * 
      * @param time 預計執行的精確未來時間
+     * @param requestsRecovery 是否啟用災後重跑
      * @return 封裝了一次性時間的排程規則
      * @throws NullPointerException 若 time 為 null
      * @throws IllegalArgumentException 若指定的時間早於系統當前時間
      */
-    public static ScheduleRule oneTime(LocalDateTime time) {
+    public static ScheduleRule oneTime(LocalDateTime time, boolean requestsRecovery) {
         Objects.requireNonNull(time, "Execute time cannot be null");
         if (time.isBefore(LocalDateTime.now())) {
             throw new IllegalArgumentException("一次性排程的執行時間必須大於當前時間 (Execute time must be in the future)");
@@ -102,6 +112,7 @@ public class ScheduleRule {
         ScheduleRule rule = new ScheduleRule();
         rule.type = ScheduleType.ONE_TIME;
         rule.executeTime = time;
+        rule.requestsRecovery = requestsRecovery;
         return rule;
     }
 

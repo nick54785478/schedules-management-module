@@ -44,9 +44,9 @@ public class GlobalJobListener implements JobStatusListener {
 	 * @param jobGroup 任務群組
 	 */
 	@Override
-	public void onJobStarting(String jobName, String jobGroup) {
+	public void onJobStarting(String jobName, String jobGroup, boolean isRecovery) {
 		startTime.set(System.currentTimeMillis());
-		log.info("[排程監控] >>> 準備執行任務: {}.{}", jobGroup, jobName);
+		log.info("[排程監控] >>> 準備執行任務: {}.{} (Recovery: {})", jobGroup, jobName, isRecovery);
 	}
 
 	/**
@@ -56,8 +56,8 @@ public class GlobalJobListener implements JobStatusListener {
 	 * @param jobGroup 任務群組
 	 */
 	@Override
-	public void onJobVetoed(String jobName, String jobGroup) {
-		log.warn("[排程監控] !!! 任務執行被中止 (Vetoed): {}.{}", jobGroup, jobName);
+	public void onJobVetoed(String jobName, String jobGroup, boolean isRecovery) {
+		log.warn("[排程監控] !!! 任務執行被中止 (Vetoed): {}.{} (Recovery: {})", jobGroup, jobName, isRecovery);
 		startTime.remove(); // 執行被取消，務必清除計時器避免 Memory Leak
 	}
 
@@ -69,16 +69,16 @@ public class GlobalJobListener implements JobStatusListener {
 	 * @param exception 若執行過程中發生業務報錯，則會傳入此例外物件；若順利執行完畢則為 null
 	 */
 	@Override
-	public void onJobExecuted(String jobName, String jobGroup, Exception exception) {
+	public void onJobExecuted(String jobName, String jobGroup, boolean isRecovery, Exception exception) {
 		Long start = startTime.get();
 		long duration = (start != null) ? (System.currentTimeMillis() - start) : 0;
 
 		// 如果 cron 為 null 代表為一次性排程。
 		if (exception != null) {
-			log.error("[排程監控] <<< 任務執行失敗: {}.{}, 耗時: {}ms, 錯誤: {}", jobGroup, jobName, duration,
+			log.error("[排程監控] <<< 任務執行失敗: {}.{} (Recovery: {}), 耗時: {}ms, 錯誤: {}", jobGroup, jobName, isRecovery, duration,
 					exception.getMessage());
 		} else {
-			log.info("[排程監控] <<< 任務執行成功: {}.{}, 總耗時: {}ms", jobGroup, jobName, duration);
+			log.info("[排程監控] <<< 任務執行成功: {}.{} (Recovery: {}), 總耗時: {}ms", jobGroup, jobName, isRecovery, duration);
 			// 執行成功後，若是 ONE_TIME 任務則變更資料庫狀態
 			applicationService.completeOneTimeJob(jobName, jobGroup);
 		}

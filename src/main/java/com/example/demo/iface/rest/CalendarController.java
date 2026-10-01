@@ -1,6 +1,7 @@
 package com.example.demo.iface.rest;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -60,7 +61,7 @@ public class CalendarController {
     @GetMapping("/{id}/holidays")
     public ResponseEntity<List<LocalDate>> getCalendarHolidays(@PathVariable("id") UUID id) {
         List<LocalDate> dates = applicationService.findCalendarById(id)
-                .map(cal -> cal.excludedDates().stream().collect(Collectors.toList()))
+                .map(cal -> new ArrayList<>(cal.excludedDates()))
                 .orElseThrow(() -> new IllegalArgumentException("找不到該日曆 ID: " + id));
         return ResponseEntity.ok(dates);
     }

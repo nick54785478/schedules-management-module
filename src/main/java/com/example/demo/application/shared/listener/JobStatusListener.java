@@ -19,7 +19,7 @@ public interface JobStatusListener {
 	 * 可用於紀錄執行開始時間點，以便後續計算總耗時。
 	 * </p>
 	 */
-	void onJobStarting(String jobName, String jobGroup);
+	void onJobStarting(String jobName, String jobGroup, boolean isRecovery);
 
 	/**
 	 * 任務執行被中止時觸發。
@@ -27,10 +27,10 @@ public interface JobStatusListener {
 	 * 當 TriggerListener 決定否決此次執行時（例如重複觸發攔截）會呼叫此方法。
 	 * </p>
 	 */
-	void onJobVetoed(String jobName, String jobGroup);
+	void onJobVetoed(String jobName, String jobGroup, boolean isRecovery);
 
 	/**
 	 * 任務執行完畢後觸發（無論成功或失敗）。
 	 */
-	void onJobExecuted(String jobName, String jobGroup, Exception exception);
+	void onJobExecuted(String jobName, String jobGroup, boolean isRecovery, Exception exception);
 }

@@ -74,7 +74,7 @@ public class ScheduleJobRegistration {
      * @param jobClass       Quartz Job 類型，對應 @Component 名稱
      */
     private void registerSystemJob(String jobName, String groupName, String cronExpression, String jobClass) {
-        CreateCronJobCommand command = new CreateCronJobCommand(jobName, groupName, jobClass, cronExpression, null);
+        CreateCronJobCommand command = new CreateCronJobCommand(jobName, groupName, jobClass, cronExpression, null, true);
         applicationService.initializeCronTask(command);
     }
 

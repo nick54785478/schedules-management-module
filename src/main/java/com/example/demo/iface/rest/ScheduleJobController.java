@@ -4,13 +4,14 @@ import com.example.demo.application.service.ScheduledJobApplicationService;
 import com.example.demo.application.shared.command.BindJobCalendarCommand;
 import com.example.demo.application.shared.command.CreateCronJobCommand;
 import com.example.demo.application.shared.command.CreateOneTimeJobCommand;
-import com.example.demo.application.shared.command.UpdateJobCronCommand;
+import com.example.demo.application.shared.command.UpdateScheduleCommand;
 import com.example.demo.application.shared.view.PageGottenView;
 import com.example.demo.application.shared.view.ScheduleJobView;
 import com.example.demo.iface.dto.req.BindJobCalendarResource;
 import com.example.demo.iface.dto.req.CreateCronJobResource;
 import com.example.demo.iface.dto.req.CreateOneTimeJobResource;
-import com.example.demo.iface.dto.req.UpdateJobCronResource;
+import com.example.demo.iface.dto.req.UpdateCronJobResource;
+import com.example.demo.iface.dto.req.UpdateOneTimeJobResource;
 import com.example.demo.iface.dto.res.JobCalendarBoundResource;
 import com.example.demo.iface.dto.res.JobCronUpdatedResource;
 import com.example.demo.iface.dto.res.PagedJobStatusSearchedResource;
@@ -50,7 +51,7 @@ public class ScheduleJobController {
     @Operation(summary = "新增定時排程任務 (Cron)", description = "註冊一個基於 Cron 的排程任務到系統與 Quartz 引擎中")
     @PostMapping("/create-cron")
     public ResponseEntity<ScheduleJobCreatedResource> createCronJob(@RequestBody CreateCronJobResource request) {
-        CreateCronJobCommand command = new CreateCronJobCommand(request.name(), request.group(), request.jobType(), request.cron(), request.calendarKey());
+        CreateCronJobCommand command = new CreateCronJobCommand(request.name(), request.group(), request.jobType(), request.cron(), request.calendarKey(), request.requestsRecovery());
         applicationService.initializeCronTask(command);
         return new ResponseEntity<>(new ScheduleJobCreatedResource("201", "定時排程任務建立成功"), HttpStatus.CREATED);
     }
@@ -58,11 +59,11 @@ public class ScheduleJobController {
     @Operation(summary = "新增一次性排程任務", description = "註冊一個單次執行的排程任務到系統與 Quartz 引擎中")
     @PostMapping("/create-one-time")
     public ResponseEntity<ScheduleJobCreatedResource> createOneTimeJob(@RequestBody CreateOneTimeJobResource request) {
-        LocalDate date = LocalDate.parse(request.executeDate(), java.time.format.DateTimeFormatter.ofPattern("yyyy/MM/dd"));
+        LocalDate date = LocalDate.parse(request.executeDate(), DateTimeFormatter.ofPattern("yyyy/MM/dd"));
         LocalTime time = LocalTime.parse(request.executeTime(), DateTimeFormatter.ofPattern("HH:mm"));
         LocalDateTime executeDateTime = LocalDateTime.of(date, time);
 
-        CreateOneTimeJobCommand command = new CreateOneTimeJobCommand(request.name(), request.group(), request.jobType(), executeDateTime);
+        CreateOneTimeJobCommand command = new CreateOneTimeJobCommand(request.name(), request.group(), request.jobType(), executeDateTime, request.requestsRecovery());
         applicationService.initializeOneTimeTask(command);
         return new ResponseEntity<>(new ScheduleJobCreatedResource("201", "一次性排程任務建立成功"), HttpStatus.CREATED);
     }
@@ -112,13 +113,28 @@ public class ScheduleJobController {
     }
 
     /**
-     * 更新特定排程的 cron
+     * 更新 Cron 排程執行時間
      */
-    @Operation(summary = "更新特定排程的 Cron", description = "修改指定排程的執行週期，並進行語法校驗")
-    @PostMapping("/update-cron")
-    public ResponseEntity<JobCronUpdatedResource> updateCron(@RequestBody UpdateJobCronResource request) {
-        UpdateJobCronCommand command = new UpdateJobCronCommand(request.name(), request.group(), request.scheduleType(), request.newCron(), request.executeTime());
-        applicationService.updateJobCron(command);
-        return ResponseEntity.ok(new JobCronUpdatedResource("200", "更新 cron 成功"));
+    @Operation(summary = "更新 Cron 排程執行時間", description = "修改指定 Cron 排程的執行週期")
+    @PutMapping("/update-cron")
+    public ResponseEntity<JobCronUpdatedResource> updateCron(@RequestBody UpdateCronJobResource request) {
+        UpdateScheduleCommand command = new UpdateScheduleCommand(request.name(), request.group(), "CRON", request.newCron(), null);
+        applicationService.updateJobSchedule(command);
+        return ResponseEntity.ok(new JobCronUpdatedResource("200", "更新 Cron 排程成功"));
+    }
+
+    /**
+     * 更新單次排程執行時間
+     */
+    @Operation(summary = "更新單次排程執行時間", description = "修改指定單次排程的執行時間")
+    @PutMapping("/update-one-time")
+    public ResponseEntity<JobCronUpdatedResource> updateOneTime(@RequestBody UpdateOneTimeJobResource request) {
+        LocalDate date = LocalDate.parse(request.executeDate(), DateTimeFormatter.ofPattern("yyyy/MM/dd"));
+        LocalTime time = LocalTime.parse(request.executeTime(), DateTimeFormatter.ofPattern("HH:mm"));
+        LocalDateTime executeDateTime = LocalDateTime.of(date, time);
+        
+        UpdateScheduleCommand command = new UpdateScheduleCommand(request.name(), request.group(), "ONE_TIME", null, executeDateTime);
+        applicationService.updateJobSchedule(command);
+        return ResponseEntity.ok(new JobCronUpdatedResource("200", "更新單次排程成功"));
     }
 }

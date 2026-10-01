@@ -10,7 +10,7 @@ import com.example.demo.application.shared.command.BindJobCalendarCommand;
 import com.example.demo.application.shared.command.CreateCronJobCommand;
 import com.example.demo.application.shared.command.CreateOneTimeJobCommand;
 import com.example.demo.application.shared.command.RegisterJobCommand;
-import com.example.demo.application.shared.command.UpdateJobCronCommand;
+import com.example.demo.application.shared.command.UpdateScheduleCommand;
 import com.example.demo.application.shared.exception.InvalidCronException;
 import com.example.demo.application.shared.exception.JobNotFoundException;
 import com.example.demo.application.shared.exception.ScheduleEngineException;
@@ -64,16 +64,16 @@ public class ScheduledJobApplicationService {
         if (existingJob.isEmpty()) {
             log.info("初始化新排程紀錄: {} - {}", command.name(), command.group());
 
-            ScheduleRule rule = createScheduleRule(ScheduleType.CRON.name(), command.cronExpression(), null, command.calendarKey());
+            ScheduleRule rule = createScheduleRule(ScheduleType.CRON.name(), command.cronExpression(), null, command.calendarKey(), command.requestsRecovery());
             ScheduledJob newJob = ScheduledJob.register(command.name(), command.group(), command.jobType(), rule);
             repository.save(newJob);
         } else {
             log.info("排程配置已存在，準備執行引擎同步: {}", command.name());
         }
 
-        ScheduleRule ruleToRegister = createScheduleRule(ScheduleType.CRON.name(), command.cronExpression(), null, command.calendarKey());
+        ScheduleRule ruleToRegister = createScheduleRule(ScheduleType.CRON.name(), command.cronExpression(), null, command.calendarKey(), command.requestsRecovery());
         RegisterJobCommand registerJobCommand = new RegisterJobCommand(command.name(),
-                command.group(), ruleToRegister, command.jobType());
+                command.group(), ruleToRegister, command.jobType(), command.requestsRecovery());
         jobScheduler.add(registerJobCommand);
     }
 
@@ -87,21 +87,21 @@ public class ScheduledJobApplicationService {
         if (existingJob.isEmpty()) {
             log.info("初始化新一次性排程紀錄: {} - {}", command.name(), command.group());
 
-            ScheduleRule rule = createScheduleRule(ScheduleType.ONE_TIME.name(), null, command.executeTime(), null);
+            ScheduleRule rule = createScheduleRule(ScheduleType.ONE_TIME.name(), null, command.executeTime(), null, command.requestsRecovery());
             ScheduledJob newJob = ScheduledJob.register(command.name(), command.group(), command.jobType(), rule);
             repository.save(newJob);
         } else {
             log.info("排程配置已存在，準備執行引擎同步: {}", command.name());
         }
 
-        ScheduleRule ruleToRegister = createScheduleRule(ScheduleType.ONE_TIME.name(), null, command.executeTime(), null);
+        ScheduleRule ruleToRegister = createScheduleRule(ScheduleType.ONE_TIME.name(), null, command.executeTime(), null, command.requestsRecovery());
         RegisterJobCommand registerJobCommand = new RegisterJobCommand(command.name(),
-                command.group(), ruleToRegister, command.jobType());
+                command.group(), ruleToRegister, command.jobType(), command.requestsRecovery());
         jobScheduler.add(registerJobCommand);
     }
 
     /**
-     * <h2>更新任務排程週期 (Cron Expression)</h2>
+     * <h2>更新任務排程週期</h2>
      * <p>
      * 修改現有任務的執行頻率。此操作具備「強校驗」特性，無效的 Cron 將被攔截於領域層之外。
      * </p>
@@ -112,14 +112,14 @@ public class ScheduledJobApplicationService {
      * @throws ScheduleEngineException 若引擎重新調度失敗
      */
     @Transactional(rollbackFor = Exception.class)
-    public void updateJobCron(UpdateJobCronCommand command) {
+    public void updateJobSchedule(UpdateScheduleCommand command) {
         // 1. 載入聚合根
         ScheduledJob job = repository.findByNameAndGroup(command.name(), command.group())
                 .orElseThrow(() -> new JobNotFoundException(command.name()));
 
         // 2. 建立新規則，並繼承既有的 calendarKey。若格式錯誤，會拋出對應 Exception。
         String existingCalendarKey = job.getScheduleRule().getCalendarKey();
-        ScheduleRule newRule = createScheduleRule(command.scheduleType(), command.newCron(), command.executeTime(), existingCalendarKey);
+        ScheduleRule newRule = createScheduleRule(command.scheduleType(), command.newCron(), command.executeTime(), existingCalendarKey, job.getScheduleRule().isRequestsRecovery());
 
         // 3. 領域聚合根更新狀態
         job.changeSchedule(newRule);
@@ -127,7 +127,7 @@ public class ScheduledJobApplicationService {
         // 4. 同步至執行引擎
         // 使用 RegisterJobCommand (因為 JobSchedulerAdapter.add() 的 replace=true 會覆寫 Trigger，也能正確帶入最新的 rule)
         RegisterJobCommand registerJobCommand = new RegisterJobCommand(job.getName(),
-                job.getGroup(), job.getScheduleRule(), job.getJobType());
+                job.getGroup(), job.getScheduleRule(), job.getJobType(), job.getScheduleRule().isRequestsRecovery());
         jobScheduler.add(registerJobCommand);
 
         // 5. 保存業務狀態
@@ -147,13 +147,14 @@ public class ScheduledJobApplicationService {
                 currentRule.getType().name(), 
                 currentRule.getCronExpression(), 
                 currentRule.getExecuteTime(), 
-                command.calendarKey());
+                command.calendarKey(),
+                currentRule.isRequestsRecovery());
 
         job.changeSchedule(newRule);
 
         // 將更新後的 Trigger 重新註冊到 Quartz
         RegisterJobCommand registerJobCommand = new RegisterJobCommand(job.getName(),
-                job.getGroup(), job.getScheduleRule(), job.getJobType());
+                job.getGroup(), job.getScheduleRule(), job.getJobType(), job.getScheduleRule().isRequestsRecovery());
         jobScheduler.add(registerJobCommand);
 
         repository.save(job);
@@ -291,14 +292,14 @@ public class ScheduledJobApplicationService {
     /**
      * 建立排程規則
      */
-    private ScheduleRule createScheduleRule(String scheduleTypeStr, String cronExpression, java.time.LocalDateTime executeTime, String calendarKey) {
+    private ScheduleRule createScheduleRule(String scheduleTypeStr, String cronExpression, java.time.LocalDateTime executeTime, String calendarKey, boolean requestsRecovery) {
         ScheduleType type = ScheduleType.valueOf(scheduleTypeStr);
         if (type == ScheduleType.CRON) {
             // 保留原本透過 Port 解析校驗的邏輯
             cronParser.parse(cronExpression);
-            return ScheduleRule.cron(cronExpression, calendarKey);
+            return ScheduleRule.cron(cronExpression, calendarKey, requestsRecovery);
         } else if (type == ScheduleType.ONE_TIME) {
-            return ScheduleRule.oneTime(executeTime);
+            return ScheduleRule.oneTime(executeTime, requestsRecovery);
         }
         throw new IllegalArgumentException("不支援的排程類型: " + scheduleTypeStr);
     }

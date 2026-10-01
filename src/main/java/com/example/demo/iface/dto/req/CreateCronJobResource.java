@@ -8,5 +8,6 @@ public record CreateCronJobResource(
 		@Schema(description = "任務群組", example = "ReportGroup") String group, 
 		@Schema(description = "任務類型 (對應 Quartz Job Bean Name)", example = "messagePrintJob") String jobType,
 		@Schema(description = "Cron 表達式", example = "0 0 12 * * ?") String cron,
-		@Schema(description = "綁定的日曆 key (選填，用於排除假日)", example = "TAIWAN_HOLIDAY") String calendarKey) {
+		@Schema(description = "綁定的日曆 key (選填，用於排除假日)", example = "TAIWAN_HOLIDAY") String calendarKey,
+		@Schema(description = "是否啟用災後重跑機制", defaultValue = "true") boolean requestsRecovery) {
 }

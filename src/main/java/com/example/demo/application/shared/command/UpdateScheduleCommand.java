@@ -14,5 +14,5 @@ import java.time.LocalDateTime;
  * @param newCron      新的 Cron 表達式字串
  * @param executeTime  精確執行時間
  */
-public record UpdateJobCronCommand(String name, String group, String scheduleType, String newCron, LocalDateTime executeTime) {
+public record UpdateScheduleCommand(String name, String group, String scheduleType, String newCron, LocalDateTime executeTime) {
 }

@@ -77,14 +77,21 @@ public class ScheduleJobLog {
 	private LocalDateTime executedAt;
 
 	/**
+	 * 是否為災後重試
+	 */
+	@Column(name = "is_recovery")
+	private Boolean isRecovery;
+
+	/**
 	 * Private Constructor，限制外部只能透過 Factory Method 建立實體
 	 */
-	private ScheduleJobLog(String jobName, String jobGroup, String status, Long durationMs, String errorMessage) {
+	private ScheduleJobLog(String jobName, String jobGroup, String status, Long durationMs, String errorMessage, Boolean isRecovery) {
 		this.jobName = jobName;
 		this.jobGroup = jobGroup;
 		this.status = status;
 		this.durationMs = durationMs;
 		this.errorMessage = errorMessage;
+		this.isRecovery = isRecovery;
 	}
 
 	/**
@@ -93,10 +100,11 @@ public class ScheduleJobLog {
 	 * @param jobName    任務名稱
 	 * @param jobGroup   任務群組
 	 * @param durationMs 執行耗時 (毫秒)
+	 * @param isRecovery 是否為災後重跑
 	 * @return ScheduleJobLog 實體
 	 */
-	public static ScheduleJobLog createSuccessLog(String jobName, String jobGroup, Long durationMs) {
-		return new ScheduleJobLog(jobName, jobGroup, "SUCCESS", durationMs, null);
+	public static ScheduleJobLog createSuccessLog(String jobName, String jobGroup, Long durationMs, Boolean isRecovery) {
+		return new ScheduleJobLog(jobName, jobGroup, "SUCCESS", durationMs, null, isRecovery);
 	}
 
 	/**
@@ -106,10 +114,11 @@ public class ScheduleJobLog {
 	 * @param jobGroup     任務群組
 	 * @param durationMs   執行耗時 (毫秒)
 	 * @param errorMessage 錯誤細節
+	 * @param isRecovery   是否為災後重跑
 	 * @return ScheduleJobLog 實體
 	 */
-	public static ScheduleJobLog createFailedLog(String jobName, String jobGroup, Long durationMs, String errorMessage) {
-		return new ScheduleJobLog(jobName, jobGroup, "FAILED", durationMs, errorMessage);
+	public static ScheduleJobLog createFailedLog(String jobName, String jobGroup, Long durationMs, String errorMessage, Boolean isRecovery) {
+		return new ScheduleJobLog(jobName, jobGroup, "FAILED", durationMs, errorMessage, isRecovery);
 	}
 
 	/**
@@ -120,9 +129,10 @@ public class ScheduleJobLog {
 	 *
 	 * @param jobName  任務名稱
 	 * @param jobGroup 任務群組
+	 * @param isRecovery 是否為災後重跑
 	 * @return ScheduleJobLog 實體
 	 */
-	public static ScheduleJobLog createVetoedLog(String jobName, String jobGroup) {
-		return new ScheduleJobLog(jobName, jobGroup, "VETOED", 0L, null);
+	public static ScheduleJobLog createVetoedLog(String jobName, String jobGroup, Boolean isRecovery) {
+		return new ScheduleJobLog(jobName, jobGroup, "VETOED", 0L, null, isRecovery);
 	}
 }

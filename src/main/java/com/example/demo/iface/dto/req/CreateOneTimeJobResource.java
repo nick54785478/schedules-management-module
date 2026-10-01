@@ -9,5 +9,6 @@ public record CreateOneTimeJobResource(
 		@Schema(description = "任務群組", example = "EventGroup") String group, 
 		@Schema(description = "任務類型 (對應 Quartz Job Bean Name)", example = "messagePrintJob") String jobType,
 		@Schema(description = "執行日期 (格式: yyyy/MM/dd)", example = "2026/12/31") String executeDate,
-		@Schema(description = "執行時間 (時分，格式: HH:mm)", example = "23:59") String executeTime) {
+		@Schema(description = "執行時間 (時分，格式: HH:mm)", example = "23:59") String executeTime,
+		@Schema(description = "是否啟用災後重跑機制", defaultValue = "true") boolean requestsRecovery) {
 }

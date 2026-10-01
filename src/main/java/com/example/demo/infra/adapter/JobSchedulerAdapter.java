@@ -6,6 +6,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.Set;
 
+import com.example.demo.application.domain.calendar.aggregate.ScheduleCalendar;
 import org.quartz.CronScheduleBuilder;
 import org.quartz.CronTrigger;
 import org.quartz.Job;
@@ -23,13 +24,14 @@ import org.quartz.SimpleTrigger;
 import org.quartz.Trigger;
 import org.quartz.TriggerBuilder;
 import org.quartz.TriggerKey;
+import org.quartz.impl.calendar.HolidayCalendar;
 import org.quartz.impl.matchers.GroupMatcher;
 import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Component;
 
 import com.example.demo.application.port.JobSchedulerPort;
 import com.example.demo.application.shared.command.RegisterJobCommand;
-import com.example.demo.application.shared.command.UpdateJobCronCommand;
+import com.example.demo.application.shared.command.UpdateScheduleCommand;
 import com.example.demo.application.shared.view.ScheduleJobView;
 import com.example.demo.application.shared.listener.JobStatusListener;
 
@@ -161,9 +163,9 @@ class JobSchedulerAdapter implements JobSchedulerPort {
 	 * 將領域層的日曆同步至底層 Quartz 引擎
 	 */
 	@Override
-	public void syncCalendar(com.example.demo.application.domain.calendar.aggregate.ScheduleCalendar domainCalendar) {
+	public void syncCalendar(ScheduleCalendar domainCalendar) {
 		try {
-			org.quartz.impl.calendar.HolidayCalendar quartzCalendar = new org.quartz.impl.calendar.HolidayCalendar();
+			HolidayCalendar quartzCalendar = new HolidayCalendar();
 			
 			for (java.time.LocalDate date : domainCalendar.getExcludedDates()) {
 				java.util.Date javaDate = java.util.Date.from(date.atStartOfDay(java.time.ZoneId.systemDefault()).toInstant());
@@ -184,7 +186,7 @@ class JobSchedulerAdapter implements JobSchedulerPort {
 	 * </p>
 	 */
 	@Override
-	public Date updateCron(UpdateJobCronCommand cmd) {
+	public Date updateSchedule(UpdateScheduleCommand cmd) {
 		try {
 			TriggerKey tk = TriggerKey.triggerKey(cmd.name() + "Trigger", cmd.group());
 			JobKey jk = JobKey.jobKey(cmd.name(), cmd.group());
@@ -192,7 +194,7 @@ class JobSchedulerAdapter implements JobSchedulerPort {
 			TriggerBuilder<Trigger> triggerBuilder = TriggerBuilder.newTrigger().withIdentity(tk).forJob(jk);
 	
 			// 如果新的指令有需要繼承日曆設定 (透過領域物件查詢，但 cmd 沒有日曆，所以這裡要從現有 job 找出 calendar)
-			// 但更簡單的是，我們已經將 Calendar 保存在 ScheduledJob 內了！不過 JobSchedulerAdapter 只有 UpdateJobCronCommand。
+			// 但更簡單的是，我們已經將 Calendar 保存在 ScheduledJob 內了！不過 JobSchedulerAdapter 只有 UpdateScheduleCommand。
 			// 讓我們手動去抓現有的 Trigger 並繼承它的 Calendar
 			try {
 				Trigger oldTrigger = scheduler.getTrigger(tk);
@@ -279,7 +281,10 @@ class JobSchedulerAdapter implements JobSchedulerPort {
 	 * @return 配置完成的 JobDetail 物件
 	 */
 	private JobDetail createJobDetail(RegisterJobCommand cmd, Class<? extends Job> jobClass) {
-		return JobBuilder.newJob(jobClass).withIdentity(cmd.name(), cmd.group()).build();
+		return JobBuilder.newJob(jobClass)
+				.withIdentity(cmd.name(), cmd.group())
+				.requestRecovery(cmd.requestsRecovery())
+				.build();
 	}
 
 	/**
@@ -382,19 +387,19 @@ class JobSchedulerAdapter implements JobSchedulerPort {
 			@Override
 			public void jobToBeExecuted(JobExecutionContext context) {
 				domainListener.onJobStarting(context.getJobDetail().getKey().getName(),
-						context.getJobDetail().getKey().getGroup());
+						context.getJobDetail().getKey().getGroup(), context.isRecovering());
 			}
 
 			@Override
 			public void jobExecutionVetoed(JobExecutionContext context) {
 				domainListener.onJobVetoed(context.getJobDetail().getKey().getName(),
-						context.getJobDetail().getKey().getGroup());
+						context.getJobDetail().getKey().getGroup(), context.isRecovering());
 			}
 
 			@Override
 			public void jobWasExecuted(JobExecutionContext context, JobExecutionException jobException) {
 				domainListener.onJobExecuted(context.getJobDetail().getKey().getName(),
-						context.getJobDetail().getKey().getGroup(), jobException);
+						context.getJobDetail().getKey().getGroup(), context.isRecovering(), jobException);
 			}
 		};
 	}

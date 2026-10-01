@@ -12,6 +12,7 @@ import com.example.demo.application.domain.schedule.aggregate.vo.ScheduleRule;
  * @param group          任務所屬群組 (唯一識別的一部分)
  * @param scheduleRule   彈性的排程規則 (CRON 或 ONE_TIME)
  * @param jobType        任務的類型標籤 (對應具體的 Quartz Job 實作)
+ * @param requestsRecovery 是否啟用災後重建
  */
-public record RegisterJobCommand(String name, String group, ScheduleRule scheduleRule, String jobType) {
+public record RegisterJobCommand(String name, String group, ScheduleRule scheduleRule, String jobType, boolean requestsRecovery) {
 }

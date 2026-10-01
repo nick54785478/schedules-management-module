@@ -19,27 +19,27 @@ public class MessagePrintJobListener implements JobStatusListener {
 	}
 
 	@Override
-	public void onJobStarting(String jobName, String jobGroup) {
+	public void onJobStarting(String jobName, String jobGroup, boolean isRecovery) {
 		startTime.set(System.currentTimeMillis());
-		log.info("[排程監控] >>> 準備執行任務: {}.{}", jobGroup, jobName);
+		log.info("[排程監控] >>> 準備執行任務: {}.{} (Recovery: {})", jobGroup, jobName, isRecovery);
 	}
 
 	@Override
-	public void onJobVetoed(String jobName, String jobGroup) {
-		log.warn("[排程監控] !!! 任務執行被中止 (Vetoed): {}.{}", jobGroup, jobName);
+	public void onJobVetoed(String jobName, String jobGroup, boolean isRecovery) {
+		log.warn("[排程監控] !!! 任務執行被中止 (Vetoed): {}.{} (Recovery: {})", jobGroup, jobName, isRecovery);
 		startTime.remove(); // 執行被取消，清除計時器
 	}
 
 	@Override
-	public void onJobExecuted(String jobName, String jobGroup, Exception exception) {
+	public void onJobExecuted(String jobName, String jobGroup, boolean isRecovery, Exception exception) {
 		Long start = startTime.get();
 		long duration = (start != null) ? (System.currentTimeMillis() - start) : 0;
 
 		if (exception != null) {
-			log.error("[排程監控] <<< 任務執行失敗: {}.{}, 耗時: {}ms, 錯誤: {}", jobGroup, jobName, duration,
+			log.error("[排程監控] <<< 任務執行失敗: {}.{} (Recovery: {}), 耗時: {}ms, 錯誤: {}", jobGroup, jobName, isRecovery, duration,
 					exception.getMessage());
 		} else {
-			log.info("[排程監控] <<< 任務執行成功: {}.{}, 總耗時: {}ms", jobGroup, jobName, duration);
+			log.info("[排程監控] <<< 任務執行成功: {}.{} (Recovery: {}), 總耗時: {}ms", jobGroup, jobName, isRecovery, duration);
 		}
 
 		startTime.remove(); // 清理 ThreadLocal

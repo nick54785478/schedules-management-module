@@ -28,8 +28,7 @@ public class AutowiringSpringBeanJobFactory extends SpringBeanJobFactory impleme
 	 */
 	@Override
 	protected Object createJobInstance(final TriggerFiredBundle bundle) throws Exception {
-		final Object job = super.createJobInstance(bundle);
-		beanFactory.autowireBean(job); // 自動注入 Spring Bean
-		return job;
+		// 使用 createBean 可以同時支援 Constructor Injection 與 Field Injection
+		return beanFactory.createBean(bundle.getJobDetail().getJobClass());
 	}
 }

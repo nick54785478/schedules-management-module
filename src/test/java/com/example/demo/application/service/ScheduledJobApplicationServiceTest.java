@@ -22,7 +22,7 @@ import com.example.demo.application.port.JobSchedulerPort;
 import com.example.demo.application.shared.command.CreateCronJobCommand;
 import com.example.demo.application.shared.command.CreateOneTimeJobCommand;
 import com.example.demo.application.shared.command.RegisterJobCommand;
-import com.example.demo.application.shared.command.UpdateJobCronCommand;
+import com.example.demo.application.shared.command.UpdateScheduleCommand;
 import com.example.demo.application.shared.exception.JobNotFoundException;
 import com.example.demo.application.shared.exception.ScheduleEngineException;
 import com.example.demo.application.domain.schedule.repository.ScheduledJobRepository;
@@ -46,7 +46,7 @@ class ScheduledJobApplicationServiceTest {
 	@DisplayName("初始化任務：當資料庫中無此任務時，應建立新聚合根並同步至 Quartz 引擎")
 	void initializeTask_ShouldRegisterNewJob_WhenJobDoesNotExist() throws Exception {
 		// Arrange
-		CreateCronJobCommand command = new CreateCronJobCommand("TestJob", "TestGroup", "testJobBean", "0 0 12 * * ?", null);
+		CreateCronJobCommand command = new CreateCronJobCommand("TestJob", "TestGroup", "testJobBean", "0 0 12 * * ?", null, true);
 		when(repository.findByNameAndGroup("TestJob", "TestGroup")).thenReturn(Optional.empty());
 
 		// Act
@@ -59,34 +59,34 @@ class ScheduledJobApplicationServiceTest {
 
 	@Test
 	@DisplayName("更新 Cron：當任務存在時，應更新領域實體狀態並同步至 Quartz，最後進行持久化")
-	void updateJobCron_ShouldUpdateAndSave_WhenJobExists() throws Exception {
+	void updateJobSchedule_ShouldUpdateAndSave_WhenJobExists() throws Exception {
 		// Arrange
-		UpdateJobCronCommand command = new UpdateJobCronCommand("TestJob", "TestGroup", "CRON", "0/5 * * * * ?", null);
-		ScheduledJob job = ScheduledJob.register("TestJob", "TestGroup", "testJobBean", ScheduleRule.cron("0 0 12 * * ?"));
+		UpdateScheduleCommand command = new UpdateScheduleCommand("TestJob", "TestGroup", "CRON", "0/5 * * * * ?", null);
+		ScheduledJob job = ScheduledJob.register("TestJob", "TestGroup", "testJobBean", ScheduleRule.cron("0 0 12 * * ?", true));
 		
 		when(repository.findByNameAndGroup("TestJob", "TestGroup")).thenReturn(Optional.of(job));
 
 		// Act
-		applicationService.updateJobCron(command);
+		applicationService.updateJobSchedule(command);
 
 		// Assert
 		assertEquals("0/5 * * * * ?", job.getScheduleRule().getCronExpression());
-		verify(jobScheduler, times(1)).updateCron(command);
+		verify(jobScheduler, times(1)).add(any(RegisterJobCommand.class));
 		verify(repository, times(1)).save(job);
 	}
 
 	@Test
 	@DisplayName("更新 Cron：當 Quartz 同步失敗時，應拋出 ScheduleEngineException，並避免持久化")
-	void updateJobCron_ShouldThrowScheduleEngineException_WhenQuartzFails() throws Exception {
+	void updateJobSchedule_ShouldThrowScheduleEngineException_WhenQuartzFails() throws Exception {
 		// Arrange
-		UpdateJobCronCommand command = new UpdateJobCronCommand("TestJob", "TestGroup", "CRON", "0/5 * * * * ?", null);
-		ScheduledJob job = ScheduledJob.register("TestJob", "TestGroup", "testJobBean", ScheduleRule.cron("0 0 12 * * ?"));
+		UpdateScheduleCommand command = new UpdateScheduleCommand("TestJob", "TestGroup", "CRON", "0/5 * * * * ?", null);
+		ScheduledJob job = ScheduledJob.register("TestJob", "TestGroup", "testJobBean", ScheduleRule.cron("0 0 12 * * ?", true));
 		
 		when(repository.findByNameAndGroup("TestJob", "TestGroup")).thenReturn(Optional.of(job));
-		doThrow(new RuntimeException("Quartz Error")).when(jobScheduler).updateCron(command);
+		doThrow(new RuntimeException("Quartz Error")).when(jobScheduler).add(any(RegisterJobCommand.class));
 
 		// Act & Assert
-		assertThrows(ScheduleEngineException.class, () -> applicationService.updateJobCron(command));
+		assertThrows(ScheduleEngineException.class, () -> applicationService.updateJobSchedule(command));
 		
 		// 驗證 Transaction 的完整性 (不會呼叫 save)
 		verify(repository, never()).save(any());
@@ -96,7 +96,7 @@ class ScheduledJobApplicationServiceTest {
 	@DisplayName("暫停任務：領域狀態應變更為 PAUSED，並同步至 Quartz 引擎")
 	void pauseTask_ShouldCallEngineAndSave_WhenJobExists() throws Exception {
 		// Arrange
-		ScheduledJob job = ScheduledJob.register("TestJob", "TestGroup", "testJobBean", ScheduleRule.cron("0 0 12 * * ?"));
+		ScheduledJob job = ScheduledJob.register("TestJob", "TestGroup", "testJobBean", ScheduleRule.cron("0 0 12 * * ?", true));
 		String jobIdValue = job.getJobId().value();
 		
 		when(repository.findByJobId(new JobId(jobIdValue))).thenReturn(Optional.of(job));
@@ -114,7 +114,7 @@ class ScheduledJobApplicationServiceTest {
 	@DisplayName("恢復任務：領域狀態應變更為 NORMAL，並同步至 Quartz 引擎")
 	void resumeTask_ShouldCallEngineAndSave_WhenJobExists() throws Exception {
 		// Arrange
-		ScheduledJob job = ScheduledJob.register("TestJob", "TestGroup", "testJobBean", ScheduleRule.cron("0 0 12 * * ?"));
+		ScheduledJob job = ScheduledJob.register("TestJob", "TestGroup", "testJobBean", ScheduleRule.cron("0 0 12 * * ?", true));
 		job.pause(); // 領域預設為暫停
 		String jobIdValue = job.getJobId().value();
 		

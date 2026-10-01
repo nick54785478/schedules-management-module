@@ -42,19 +42,19 @@ public class PersistJobLogListener implements JobStatusListener {
 	}
 
 	@Override
-	public void onJobStarting(String jobName, String jobGroup) {
+	public void onJobStarting(String jobName, String jobGroup, boolean isRecovery) {
 		if (!isLogEnabled) return;
 		startTime.set(System.currentTimeMillis());
 	}
 
 	@Override
 	@Transactional(propagation = Propagation.REQUIRES_NEW)
-	public void onJobVetoed(String jobName, String jobGroup) {
+	public void onJobVetoed(String jobName, String jobGroup, boolean isRecovery) {
 		if (!isLogEnabled) return;
 		
 		startTime.remove();
 		try {
-			ScheduleJobLog logEntity = ScheduleJobLog.createVetoedLog(jobName, jobGroup);
+			ScheduleJobLog logEntity = ScheduleJobLog.createVetoedLog(jobName, jobGroup, isRecovery);
 			logRepository.save(logEntity);
 		} catch (Exception e) {
 			log.error("寫入任務中止日誌失敗", e);
@@ -63,7 +63,7 @@ public class PersistJobLogListener implements JobStatusListener {
 
 	@Override
 	@Transactional(propagation = Propagation.REQUIRES_NEW)
-	public void onJobExecuted(String jobName, String jobGroup, Exception exception) {
+	public void onJobExecuted(String jobName, String jobGroup, boolean isRecovery, Exception exception) {
 		if (!isLogEnabled) return;
 		
 		Long start = startTime.get();
@@ -77,9 +77,9 @@ public class PersistJobLogListener implements JobStatusListener {
 				if (errorMsg != null && errorMsg.length() > 500) {
 					errorMsg = errorMsg.substring(0, 500); // 截斷避免欄位溢位
 				}
-				logEntity = ScheduleJobLog.createFailedLog(jobName, jobGroup, duration, errorMsg);
+				logEntity = ScheduleJobLog.createFailedLog(jobName, jobGroup, duration, errorMsg, isRecovery);
 			} else {
-				logEntity = ScheduleJobLog.createSuccessLog(jobName, jobGroup, duration);
+				logEntity = ScheduleJobLog.createSuccessLog(jobName, jobGroup, duration, isRecovery);
 			}
 			logRepository.save(logEntity);
 		} catch (Exception e) {

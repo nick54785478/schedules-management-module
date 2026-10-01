@@ -3,11 +3,12 @@ package com.example.demo.application.port;
 import java.util.Date;
 import java.util.List;
 
+import com.example.demo.application.domain.calendar.aggregate.ScheduleCalendar;
 import com.example.demo.application.shared.exception.CalendarSyncException;
 import com.example.demo.application.shared.exception.ScheduleEngineException;
 
 import com.example.demo.application.shared.command.RegisterJobCommand;
-import com.example.demo.application.shared.command.UpdateJobCronCommand;
+import com.example.demo.application.shared.command.UpdateScheduleCommand;
 import com.example.demo.application.shared.view.ScheduleJobView;
 import com.example.demo.application.shared.listener.JobStatusListener;
 
@@ -69,7 +70,7 @@ public interface JobSchedulerPort {
 	 * @param calendar 領域層的日曆聚合根
 	 * @throws CalendarSyncException 當日曆同步至底層引擎失敗時拋出
 	 */
-	void syncCalendar(com.example.demo.application.domain.calendar.aggregate.ScheduleCalendar calendar) throws CalendarSyncException;
+	void syncCalendar(ScheduleCalendar calendar) throws CalendarSyncException;
 
 	/**
 	 * 更新現有排程的 Cron 表達式。
@@ -78,7 +79,7 @@ public interface JobSchedulerPort {
 	 * @return 下一次預計觸發的時間點
 	 * @throws ScheduleEngineException 當更新 Cron 或重新排程失敗時拋出
 	 */
-	Date updateCron(UpdateJobCronCommand command) throws ScheduleEngineException;
+	Date updateSchedule(UpdateScheduleCommand command) throws ScheduleEngineException;
 
 	/**
 	 * 註冊全域監聽器（監聽所有排程任務）。

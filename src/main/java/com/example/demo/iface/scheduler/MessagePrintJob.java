@@ -11,7 +11,7 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 @Component
 @DisallowConcurrentExecution
-public class 	MessagePrintJob implements Job {
+public class MessagePrintJob implements Job {
 
 	@Override
 	public void execute(JobExecutionContext context) throws JobExecutionException {
