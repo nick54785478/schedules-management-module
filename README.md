@@ -38,6 +38,12 @@
 >* **以功能切片 (Package by Feature)**：Domain Layer 內部依照功能切分子領域（如 `schedule`, `calendar`, `joblog`），將對應的 Aggregate Root 與 VO 收攏在一起，保持極高的模組內聚性。
 >* **領域防腐與封裝 (Encapsulation)**：即便引入了 Lombok，依然嚴格透過覆寫 Getter 回傳 `Collections.unmodifiableSet()` 來防止底層 Collection 被外部意外竄改；並且封閉 Setter，要求所有業務狀態的變更都必須透過具備防禦性設計的領域方法（如 `changeSchedule`）進行，拒絕退化為貧血模型 (Anemic Domain Model)。
 
+**5. 微服務引入指南 (Microservice Integration Guide)**
+本模組在內部雖然具備完整的 DDD 架構，但**當其他微服務引入此模組時，請將本模組的所有內容 (包含其 Domain 層) 視為該微服務的 Infrastructure (基礎設施層)**。
+> 對於您的微服務而言，排程管理僅是一種「技術支援」或「外部系統」。因此：
+> * **避免業務污染**：微服務的核心業務邏輯 (Domain Layer) 中，絕不該出現對 `ScheduledJob` 等本模組實體的直接依賴。
+> * **依賴反轉**：您的業務領域應該定義自己的 Port (介面)，並在微服務的 Infrastructure 層實作該 Port，於其中呼叫本模組的 Application Service 或 API 來達成排程任務的註冊與管理，以此保持微服務核心業務的絕對純潔性。
+
 ## 開發者指南
 
 ### 建立一支排程工作的步驟
@@ -50,8 +56,8 @@
 >* **動態解析機制**：根據 `JobSchedulerAdapter.lookupJobClass` 的設計，系統會直接透過 **Bean Name** 來建置對應的 Job 類別。這避免了在資料庫硬編碼類別路徑 (Class Path)，包名更動時系統依然穩定，達到 Domain 與技術實作解耦。
 
 2. 註冊該排程至系統中 (二擇一)
->* **系統啟動時註冊**：透過 `ScheduleJobRegistration` 內的 `initializeTask` 方法註冊（此方法具備冪等性 Replace 模式），並將 `jobType` 參數指定為您的 Bean Name。
->* **透過 API 動態新增**：呼叫 `POST /jobs/create`，並在請求的 `jobType` 傳入您的 Bean Name。
+>* **系統啟動時註冊**：透過 `ScheduleJobRegistration` 監聽 `@EventListener(ApplicationReadyEvent.class)` 並呼叫 `initializeTask` 方法註冊（此方法具備冪等性 Replace 模式），確保在 Spring Boot 與 JPA 徹底初始化後才執行，避免 `JPA metamodel` 空白等錯誤。
+>* **透過 API 動態新增**：呼叫 `POST /jobs/create-cron` 或 `POST /jobs/create-one-time`。
 
 3. 自定義排程監聽器 (Observer Pattern)
 >* 實作介面：建立類別並實作 `com.example.demo.application.shared.listener.JobStatusListener` 介面。
@@ -80,16 +86,24 @@
 >* Path: /resume/{jobId}
 >* 描述: 恢復已暫停的任務進入等待執行狀態。
 
-**4. 更新 Cron 表達式**
->* Method: POST
->* Path: /update-cron
->* 描述: 修改特定任務的執行週期。
+**4. 更新排程執行時間**
+>* Method: PUT
+>* Path: `/update-cron` 或 `/update-one-time`
+>* 描述: 修改特定任務的執行週期 (Cron 或單次執行時間)。
 
 **5. 新增排程任務**
 >* Method: POST
->* Path: /create
->* 描述: 註冊一個新的排程任務到系統與 Quartz 引擎中。需傳遞任務名稱、群組、Cron 表達式以及對應的 Bean Name (`jobType`)。
+>* Path: `/create-cron` 或 `/create-one-time`
+>* 描述: 註冊一個新的排程任務到系統與 Quartz 引擎中。需傳遞任務名稱、群組、排程時間以及對應的 Bean Name (`jobType`)。
 >* 冪等性: 採用 Replace 模式，若相同 `name` 與 `group` 的排程已存在則會進行覆寫。
+
+**6. 綁定日曆 (排除假日)**
+>* Method: PUT
+>* Path: `/bind-calendar`
+>* 描述: 為排程任務綁定日曆黑名單，傳入空字串或 null 可解除綁定。
+
+**7. 日曆黑名單管理 API**
+>* 基礎路徑為 `/api/calendars`。提供 `POST /` (建立日曆)、`POST /{id}/holidays` (新增排除日期)、`DELETE /{id}/holidays/{date}` (移除排除日期) 等介面。
 
 ## 運維監控與執行日誌
 
@@ -103,7 +117,11 @@
 >* **叢集唯一觸發保證**: 依賴資料庫 `QRTZ_LOCKS` 行鎖機制，同一個排程任務在同一時間點只會被「一台」機器搶得執行權。因此，全域 Listener (如 `GlobalJobListener`, `PersistJobLogListener`) **只會在那一台執行的機器上被觸發一次**，不會產生併發重複寫入日誌的問題。
 >* **業務冪等性需自行控制 (重要)**: 若執行任務的機器中途崩潰 (Crash) 且排程配置了 `RequestsRecovery`，Quartz 會將任務轉交由另一台機器重新執行，此時 Listener 會被**再次觸發**。Quartz 原生不保證 Listener 內部業務的絕對冪等，若於 Listener 內實作敏感業務 (如發信、扣款)，必須自行實作冪等控制 (如 Unique Key 或 Redis Check)。
 
-**3. 異常代碼定義**
+**3. 異常代碼定義與輸入檢核 (Input Validation)**
+> 系統整合了 Spring Validation (`@Valid`, `jakarta.validation.constraints`) 進行第一線防呆，並由 `GlobalExceptionHandler` 統一攔截轉譯：
+>* VALIDATION_FAILED (400): Request Body 缺少必填欄位 (如: `@NotBlank` 攔截)。
+>* TYPE_MISMATCH (400): URL 參數格式轉換失敗 (如: LocalDate 需要 yyyy-MM-dd 卻傳入 yyyy/MM/dd)。
+>* BAD_REQUEST (400): 領域模型的業務防呆檢查未通過 (攔截 `IllegalArgumentException`)。
 >* INVALID_CRON (422): 使用者輸入的 Cron 格式錯誤（如：日與週同時指定）。
 >* JOB_NOT_FOUND (404): 操作了不存在的任務識別碼。
 >* ENGINE_ERROR (500): Quartz 引擎發生底層技術故障（如：資料庫連線中斷）。
