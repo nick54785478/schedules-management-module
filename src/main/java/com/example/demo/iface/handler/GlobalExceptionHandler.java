@@ -4,6 +4,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import com.example.demo.application.port.CronParserPort;
 import com.example.demo.application.shared.exception.InvalidCronException;
@@ -94,6 +95,38 @@ public class GlobalExceptionHandler {
 	public ErrorResponse handleCalendarSyncError(CalendarSyncException e) {
 		log.error("[API 異常] 日曆同步發生非預期故障: ", e);
 		return new ErrorResponse("CALENDAR_SYNC_ERROR", e.getMessage());
+	}
+
+	/**
+	 * 處理不合法的參數例外 (HTTP 400)。
+	 * <p>
+	 * 適用情境：當傳入的請求參數不符合預期，或領域物件的業務防呆機制拋出例外時。
+	 * </p>
+	 * 
+	 * @param e {@link IllegalArgumentException}
+	 * @return 錯誤響應
+	 */
+	@ExceptionHandler(IllegalArgumentException.class)
+	@ResponseStatus(HttpStatus.BAD_REQUEST)
+	public ErrorResponse handleIllegalArgumentException(IllegalArgumentException e) {
+		log.warn("[API 異常] 請求參數不合法: {}", e.getMessage());
+		return new ErrorResponse("BAD_REQUEST", e.getMessage());
+	}
+
+	/**
+	 * 處理 URL 路徑變數或查詢參數型別轉換失敗例外 (HTTP 400)。
+	 * <p>
+	 * 適用情境：例如 LocalDate 需要 yyyy-MM-dd 但前端傳入了 yyyy/MM/dd。
+	 * </p>
+	 * 
+	 * @param e {@link MethodArgumentTypeMismatchException}
+	 * @return 錯誤響應
+	 */
+	@ExceptionHandler(MethodArgumentTypeMismatchException.class)
+	@ResponseStatus(HttpStatus.BAD_REQUEST)
+	public ErrorResponse handleTypeMismatchException(MethodArgumentTypeMismatchException e) {
+		log.warn("[API 異常] 參數型別轉換失敗: 參數名稱 '{}' 的值 '{}' 無法轉換為預期的型別", e.getName(), e.getValue());
+		return new ErrorResponse("TYPE_MISMATCH", String.format("參數 '%s' 的格式或型別錯誤，請檢查輸入值", e.getName()));
 	}
 
 	/**

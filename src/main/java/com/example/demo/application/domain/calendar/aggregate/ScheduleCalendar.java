@@ -94,7 +94,10 @@ public class ScheduleCalendar {
      */
     public void removeExcludedDate(LocalDate date) {
         if (date != null) {
-            this.excludedDates.remove(date);
+            boolean removed = this.excludedDates.remove(date);
+            if (!removed) {
+                throw new IllegalArgumentException("無法移除不存在的排除日期: " + date);
+            }
         }
     }
 

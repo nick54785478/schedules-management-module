@@ -83,7 +83,7 @@ class ScheduledJobApplicationServiceTest {
 		ScheduledJob job = ScheduledJob.register("TestJob", "TestGroup", "testJobBean", ScheduleRule.cron("0 0 12 * * ?", true));
 		
 		when(repository.findByNameAndGroup("TestJob", "TestGroup")).thenReturn(Optional.of(job));
-		doThrow(new RuntimeException("Quartz Error")).when(jobScheduler).add(any(RegisterJobCommand.class));
+		doThrow(new ScheduleEngineException("Update", "TestGroup", "TestJob", new RuntimeException("Quartz Error"))).when(jobScheduler).add(any(RegisterJobCommand.class));
 
 		// Act & Assert
 		assertThrows(ScheduleEngineException.class, () -> applicationService.updateJobSchedule(command));

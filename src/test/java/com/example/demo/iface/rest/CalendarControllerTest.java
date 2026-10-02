@@ -4,16 +4,18 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
 
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
@@ -22,6 +24,7 @@ import com.example.demo.application.domain.calendar.aggregate.ScheduleCalendar;
 import com.example.demo.application.service.CalendarApplicationService;
 import com.example.demo.application.shared.command.AddExcludedDateCommand;
 import com.example.demo.application.shared.command.CreateCalendarCommand;
+import com.example.demo.application.shared.view.ScheduleCalendarView;
 
 @WebMvcTest(CalendarController.class)
 class CalendarControllerTest {
@@ -38,14 +41,17 @@ class CalendarControllerTest {
         // Act & Assert
         mockMvc.perform(post("/api/calendars")
                 .contentType(MediaType.APPLICATION_JSON)
+                .characterEncoding("UTF-8")
+                .accept(MediaType.APPLICATION_JSON)
                 .content("""
                         {
                             "key": "TAIWAN_HOLIDAY",
                             "description": "台灣國定假日"
                         }
                         """))
+                .andDo(print())
                 .andExpect(status().isCreated())
-                .andExpect(content().string("日曆建立成功"));
+                .andExpect(jsonPath("$.message").value("日曆建立成功"));
 
         verify(applicationService, times(1)).createCalendar(any(CreateCalendarCommand.class));
     }
@@ -55,14 +61,17 @@ class CalendarControllerTest {
     void getCalendarHolidays_ShouldReturnList() throws Exception {
         // Arrange
         UUID id = UUID.randomUUID();
-        ScheduleCalendar mockCalendar = ScheduleCalendar.create("TAIWAN_HOLIDAY", "desc");
-        mockCalendar.addExcludedDate(LocalDate.of(2026, 1, 1));
-        mockCalendar.addExcludedDate(LocalDate.of(2026, 2, 28));
+        ScheduleCalendarView mockCalendarView = new ScheduleCalendarView(id, "TAIWAN_HOLIDAY", "desc", new java.util.LinkedHashSet<>(List.of(
+                LocalDate.of(2026, 1, 1),
+                LocalDate.of(2026, 2, 28)
+        )));
 
-        when(applicationService.findCalendarById(id)).thenReturn(Optional.of(mockCalendar));
+        when(applicationService.findCalendarById(id)).thenReturn(Optional.of(mockCalendarView));
 
         // Act & Assert
-        mockMvc.perform(get("/api/calendars/" + id + "/holidays"))
+        mockMvc.perform(get("/api/calendars/" + id + "/holidays")
+                .accept(MediaType.APPLICATION_JSON))
+                .andDo(print())
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(2))
                 .andExpect(jsonPath("$[0]").value("2026-01-01"))
@@ -76,13 +85,16 @@ class CalendarControllerTest {
         // Act & Assert
         mockMvc.perform(post("/api/calendars/" + id + "/holidays")
                 .contentType(MediaType.APPLICATION_JSON)
+                .characterEncoding("UTF-8")
+                .accept(MediaType.APPLICATION_JSON)
                 .content("""
                         {
                             "date": "2026-10-10"
                         }
                         """))
+                .andDo(print())
                 .andExpect(status().isOk())
-                .andExpect(content().string("假日新增成功"));
+                .andExpect(jsonPath("$.message").value("假日新增成功"));
 
         verify(applicationService, times(1)).addExcludedDate(any(AddExcludedDateCommand.class));
     }
@@ -92,9 +104,11 @@ class CalendarControllerTest {
     void removeHoliday_ShouldReturn200() throws Exception {
         UUID id = UUID.randomUUID();
         // Act & Assert
-        mockMvc.perform(delete("/api/calendars/" + id + "/holidays/2026-10-10"))
+        mockMvc.perform(delete("/api/calendars/" + id + "/holidays/2026-10-10")
+                .accept(MediaType.APPLICATION_JSON))
+                .andDo(print())
                 .andExpect(status().isOk())
-                .andExpect(content().string("假日移除成功"));
+                .andExpect(jsonPath("$.message").value("假日移除成功"));
 
         verify(applicationService, times(1)).removeExcludedDate(eq(id), eq(LocalDate.of(2026, 10, 10)));
     }

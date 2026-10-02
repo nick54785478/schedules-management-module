@@ -6,7 +6,8 @@ import com.example.demo.application.shared.command.CreateCronJobCommand;
 import com.example.demo.infra.quartz.listener.global.GlobalJobListener;
 import com.example.demo.infra.quartz.listener.global.PersistJobLogListener;
 import com.example.demo.infra.quartz.listener.impl.MessagePrintJobListener;
-import jakarta.annotation.PostConstruct;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -40,7 +41,7 @@ public class ScheduleJobRegistration {
     private final PersistJobLogListener persistJobLogListener; // 持久化日誌監聽器
     private final ScheduledJobApplicationService applicationService;
 
-    @PostConstruct
+    @EventListener(ApplicationReadyEvent.class)
     public void init() throws Exception {
 
         // --- A. 監聽器註冊區 ---

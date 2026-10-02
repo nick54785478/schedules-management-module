@@ -121,4 +121,21 @@ class CalendarApplicationServiceTest {
         ScheduleCalendar updatedCalendar = calendarCaptor.getAllValues().get(0);
         assertFalse(updatedCalendar.getExcludedDates().contains(targetDate));
     }
+
+    @Test
+    @DisplayName("移除排除日期：當日期不存在時，應拋出例外且不同步")
+    void removeExcludedDate_ShouldThrowException_WhenDateNotExists() throws Exception {
+        // Arrange
+        LocalDate targetDate = LocalDate.of(2026, 1, 1);
+        when(repository.findById(testId)).thenReturn(Optional.of(testCalendar));
+
+        // Act & Assert
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> {
+            applicationService.removeExcludedDate(testId, targetDate);
+        });
+
+        assertEquals("無法移除不存在的排除日期: 2026-01-01", exception.getMessage());
+        verify(repository, never()).save(any());
+        verify(jobScheduler, never()).syncCalendar(any());
+    }
 }
