@@ -4,6 +4,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.validation.FieldError;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import com.example.demo.application.port.CronParserPort;
@@ -127,6 +129,26 @@ public class GlobalExceptionHandler {
 	public ErrorResponse handleTypeMismatchException(MethodArgumentTypeMismatchException e) {
 		log.warn("[API 異常] 參數型別轉換失敗: 參數名稱 '{}' 的值 '{}' 無法轉換為預期的型別", e.getName(), e.getValue());
 		return new ErrorResponse("TYPE_MISMATCH", String.format("參數 '%s' 的格式或型別錯誤，請檢查輸入值", e.getName()));
+	}
+
+	/**
+	 * 處理 Request Body 欄位驗證失敗例外 (HTTP 400)。
+	 * <p>
+	 * 適用情境：例如加上 @Valid 的 DTO 中 @NotBlank 攔截到未填寫的欄位時。
+	 * </p>
+	 * 
+	 * @param e {@link MethodArgumentNotValidException}
+	 * @return 錯誤響應
+	 */
+	@ExceptionHandler(MethodArgumentNotValidException.class)
+	@ResponseStatus(HttpStatus.BAD_REQUEST)
+	public ErrorResponse handleValidationException(MethodArgumentNotValidException e) {
+		String messages = e.getBindingResult().getFieldErrors().stream()
+				.map(FieldError::getDefaultMessage)
+				.reduce((msg1, msg2) -> msg1 + ", " + msg2)
+				.orElse("參數格式校驗失敗");
+		log.warn("[API 異常] 請求內容欄位驗證失敗: {}", messages);
+		return new ErrorResponse("VALIDATION_FAILED", messages);
 	}
 
 	/**

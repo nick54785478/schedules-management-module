@@ -1,11 +1,18 @@
 package com.example.demo.iface.rest;
 
-import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.stream.Collectors;
-
+import com.example.demo.application.service.CalendarApplicationService;
+import com.example.demo.application.shared.command.AddExcludedDateCommand;
+import com.example.demo.application.shared.command.CreateCalendarCommand;
 import com.example.demo.application.shared.view.PageGottenView;
+import com.example.demo.iface.dto.req.AddExcludedDateResource;
+import com.example.demo.iface.dto.req.CreateCalendarResource;
+import com.example.demo.iface.dto.res.CalendarCreatedResource;
+import com.example.demo.iface.dto.res.HolidayAddedResource;
+import com.example.demo.iface.dto.res.HolidayRemovedResource;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -17,19 +24,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.example.demo.application.service.CalendarApplicationService;
-import com.example.demo.application.shared.command.AddExcludedDateCommand;
-import com.example.demo.application.shared.command.CreateCalendarCommand;
-import com.example.demo.iface.dto.req.AddExcludedDateResource;
-import com.example.demo.iface.dto.req.CreateCalendarResource;
-import com.example.demo.iface.dto.res.CalendarCreatedResource;
-import com.example.demo.iface.dto.res.HolidayAddedResource;
-import com.example.demo.iface.dto.res.HolidayRemovedResource;
-
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.tags.Tag;
-import lombok.RequiredArgsConstructor;
-
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 @Tag(name = "Calendar APIs", description = "排程日曆 (例外黑名單) 管理介面")
@@ -42,7 +39,7 @@ public class CalendarController {
 
     @Operation(summary = "建立新日曆", description = "建立一個全新的全域日曆黑名單")
     @PostMapping
-    public ResponseEntity<CalendarCreatedResource> createCalendar(@RequestBody CreateCalendarResource request) {
+    public ResponseEntity<CalendarCreatedResource> createCalendar(@Valid @RequestBody CreateCalendarResource request) {
         CreateCalendarCommand command = new CreateCalendarCommand(request.key(), request.description());
         applicationService.createCalendar(command);
         return new ResponseEntity<>(new CalendarCreatedResource("201", "日曆建立成功"), HttpStatus.CREATED);
@@ -68,7 +65,7 @@ public class CalendarController {
 
     @Operation(summary = "新增排除日期", description = "為指定的日曆新增一天例外假日")
     @PostMapping("/{id}/holidays")
-    public ResponseEntity<HolidayAddedResource> addHoliday(@PathVariable("id") UUID id, @RequestBody AddExcludedDateResource request) {
+    public ResponseEntity<HolidayAddedResource> addHoliday(@PathVariable("id") UUID id, @Valid @RequestBody AddExcludedDateResource request) {
         AddExcludedDateCommand command = new AddExcludedDateCommand(id, request.date());
         applicationService.addExcludedDate(command);
         return ResponseEntity.ok(new HolidayAddedResource("200", "假日新增成功"));

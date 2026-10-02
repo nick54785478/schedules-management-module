@@ -23,6 +23,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.AllArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -50,7 +51,7 @@ public class ScheduleJobController {
      */
     @Operation(summary = "新增定時排程任務 (Cron)", description = "註冊一個基於 Cron 的排程任務到系統與 Quartz 引擎中")
     @PostMapping("/create-cron")
-    public ResponseEntity<ScheduleJobCreatedResource> createCronJob(@RequestBody CreateCronJobResource request) {
+    public ResponseEntity<ScheduleJobCreatedResource> createCronJob(@Valid @RequestBody CreateCronJobResource request) {
         CreateCronJobCommand command = new CreateCronJobCommand(request.name(), request.group(), request.jobType(), request.cron(), request.calendarKey(), request.requestsRecovery());
         applicationService.initializeCronTask(command);
         return new ResponseEntity<>(new ScheduleJobCreatedResource("201", "定時排程任務建立成功"), HttpStatus.CREATED);
@@ -58,7 +59,7 @@ public class ScheduleJobController {
 
     @Operation(summary = "新增一次性排程任務", description = "註冊一個單次執行的排程任務到系統與 Quartz 引擎中")
     @PostMapping("/create-one-time")
-    public ResponseEntity<ScheduleJobCreatedResource> createOneTimeJob(@RequestBody CreateOneTimeJobResource request) {
+    public ResponseEntity<ScheduleJobCreatedResource> createOneTimeJob(@Valid @RequestBody CreateOneTimeJobResource request) {
         LocalDate date = LocalDate.parse(request.executeDate(), DateTimeFormatter.ofPattern("yyyy/MM/dd"));
         LocalTime time = LocalTime.parse(request.executeTime(), DateTimeFormatter.ofPattern("HH:mm"));
         LocalDateTime executeDateTime = LocalDateTime.of(date, time);
@@ -73,7 +74,7 @@ public class ScheduleJobController {
      */
     @Operation(summary = "綁定或解除綁定排程日曆", description = "為現有的排程任務綁定指定的日曆黑名單（傳入 null 或空字串表示解除綁定）")
     @PutMapping("/bind-calendar")
-    public ResponseEntity<JobCalendarBoundResource> bindJobCalendar(@RequestBody BindJobCalendarResource request) {
+    public ResponseEntity<JobCalendarBoundResource> bindJobCalendar(@Valid @RequestBody BindJobCalendarResource request) {
         BindJobCalendarCommand command = new BindJobCalendarCommand(request.name(), request.group(), request.calendarKey());
         applicationService.bindCalendar(command);
         return ResponseEntity.ok(new JobCalendarBoundResource("200", "排程任務日曆綁定更新成功"));
@@ -117,7 +118,7 @@ public class ScheduleJobController {
      */
     @Operation(summary = "更新 Cron 排程執行時間", description = "修改指定 Cron 排程的執行週期")
     @PutMapping("/update-cron")
-    public ResponseEntity<JobCronUpdatedResource> updateCron(@RequestBody UpdateCronJobResource request) {
+    public ResponseEntity<JobCronUpdatedResource> updateCron(@Valid @RequestBody UpdateCronJobResource request) {
         UpdateScheduleCommand command = new UpdateScheduleCommand(request.name(), request.group(), "CRON", request.newCron(), null);
         applicationService.updateJobSchedule(command);
         return ResponseEntity.ok(new JobCronUpdatedResource("200", "更新 Cron 排程成功"));
@@ -128,7 +129,7 @@ public class ScheduleJobController {
      */
     @Operation(summary = "更新單次排程執行時間", description = "修改指定單次排程的執行時間")
     @PutMapping("/update-one-time")
-    public ResponseEntity<JobCronUpdatedResource> updateOneTime(@RequestBody UpdateOneTimeJobResource request) {
+    public ResponseEntity<JobCronUpdatedResource> updateOneTime(@Valid @RequestBody UpdateOneTimeJobResource request) {
         LocalDate date = LocalDate.parse(request.executeDate(), DateTimeFormatter.ofPattern("yyyy/MM/dd"));
         LocalTime time = LocalTime.parse(request.executeTime(), DateTimeFormatter.ofPattern("HH:mm"));
         LocalDateTime executeDateTime = LocalDateTime.of(date, time);
