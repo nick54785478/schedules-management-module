@@ -19,8 +19,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.example.demo.application.domain.calendar.aggregate.ScheduleCalendar;
 import com.example.demo.application.port.JobSchedulerPort;
-import com.example.demo.application.shared.command.AddExcludedDateCommand;
-import com.example.demo.application.shared.command.CreateCalendarCommand;
+import com.example.demo.application.shared.command.outbound.SyncCalendarToEngineCommand;
+import com.example.demo.application.shared.command.inbound.AddExcludedDateCommand;
+import com.example.demo.application.shared.command.inbound.CreateCalendarCommand;
 import com.example.demo.application.domain.calendar.repository.ScheduleCalendarRepository;
 import org.quartz.SchedulerException;
 
@@ -58,9 +59,9 @@ class CalendarApplicationServiceTest {
         // Assert
         ArgumentCaptor<ScheduleCalendar> calendarCaptor = ArgumentCaptor.forClass(ScheduleCalendar.class);
         verify(repository, times(1)).save(calendarCaptor.capture());
-        verify(jobScheduler, times(1)).syncCalendar(calendarCaptor.capture());
+        verify(jobScheduler, times(1)).syncCalendar(any(SyncCalendarToEngineCommand.class));
 
-        ScheduleCalendar savedCalendar = calendarCaptor.getAllValues().get(0);
+        ScheduleCalendar savedCalendar = calendarCaptor.getValue();
         assertEquals("NEW_HOLIDAY", savedCalendar.getKey());
         assertEquals("新的假期日曆", savedCalendar.getDescription());
     }
@@ -96,9 +97,9 @@ class CalendarApplicationServiceTest {
         // Assert
         ArgumentCaptor<ScheduleCalendar> calendarCaptor = ArgumentCaptor.forClass(ScheduleCalendar.class);
         verify(repository, times(1)).save(calendarCaptor.capture());
-        verify(jobScheduler, times(1)).syncCalendar(calendarCaptor.capture());
+        verify(jobScheduler, times(1)).syncCalendar(any(SyncCalendarToEngineCommand.class));
 
-        ScheduleCalendar updatedCalendar = calendarCaptor.getAllValues().get(0);
+        ScheduleCalendar updatedCalendar = calendarCaptor.getValue();
         assertTrue(updatedCalendar.getExcludedDates().contains(targetDate));
     }
 
@@ -116,9 +117,9 @@ class CalendarApplicationServiceTest {
         // Assert
         ArgumentCaptor<ScheduleCalendar> calendarCaptor = ArgumentCaptor.forClass(ScheduleCalendar.class);
         verify(repository, times(1)).save(calendarCaptor.capture());
-        verify(jobScheduler, times(1)).syncCalendar(calendarCaptor.capture());
+        verify(jobScheduler, times(1)).syncCalendar(any(SyncCalendarToEngineCommand.class));
 
-        ScheduleCalendar updatedCalendar = calendarCaptor.getAllValues().get(0);
+        ScheduleCalendar updatedCalendar = calendarCaptor.getValue();
         assertFalse(updatedCalendar.getExcludedDates().contains(targetDate));
     }
 
@@ -139,3 +140,4 @@ class CalendarApplicationServiceTest {
         verify(jobScheduler, never()).syncCalendar(any());
     }
 }
+

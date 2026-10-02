@@ -1,4 +1,4 @@
-package com.example.demo.application.shared.command;
+package com.example.demo.application.shared.command.inbound;
 
 import java.time.LocalDateTime;
 
@@ -13,3 +13,4 @@ import java.time.LocalDateTime;
  */
 public record CreateOneTimeJobCommand(String name, String group, String jobType, LocalDateTime executeTime, boolean requestsRecovery) {
 }
+

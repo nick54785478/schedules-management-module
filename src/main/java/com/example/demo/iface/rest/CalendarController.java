@@ -1,8 +1,8 @@
 package com.example.demo.iface.rest;
 
 import com.example.demo.application.service.CalendarApplicationService;
-import com.example.demo.application.shared.command.AddExcludedDateCommand;
-import com.example.demo.application.shared.command.CreateCalendarCommand;
+import com.example.demo.application.shared.command.inbound.AddExcludedDateCommand;
+import com.example.demo.application.shared.command.inbound.CreateCalendarCommand;
 import com.example.demo.application.shared.view.PageGottenView;
 import com.example.demo.iface.dto.req.AddExcludedDateResource;
 import com.example.demo.iface.dto.req.CreateCalendarResource;
@@ -78,3 +78,4 @@ public class CalendarController {
         return ResponseEntity.ok(new HolidayRemovedResource("200", "假日移除成功"));
     }
 }
+

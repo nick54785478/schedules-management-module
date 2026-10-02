@@ -22,8 +22,8 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import com.example.demo.application.domain.calendar.aggregate.ScheduleCalendar;
 import com.example.demo.application.service.CalendarApplicationService;
-import com.example.demo.application.shared.command.AddExcludedDateCommand;
-import com.example.demo.application.shared.command.CreateCalendarCommand;
+import com.example.demo.application.shared.command.inbound.AddExcludedDateCommand;
+import com.example.demo.application.shared.command.inbound.CreateCalendarCommand;
 import com.example.demo.application.shared.view.ScheduleCalendarView;
 
 @WebMvcTest(CalendarController.class)
@@ -113,3 +113,4 @@ class CalendarControllerTest {
         verify(applicationService, times(1)).removeExcludedDate(eq(id), eq(LocalDate.of(2026, 10, 10)));
     }
 }
+

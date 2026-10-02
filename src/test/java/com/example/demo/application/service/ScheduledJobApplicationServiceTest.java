@@ -19,10 +19,10 @@ import com.example.demo.application.domain.schedule.aggregate.vo.ScheduleType;
 import com.example.demo.application.domain.schedule.aggregate.vo.JobId;
 import com.example.demo.application.port.CronParserPort;
 import com.example.demo.application.port.JobSchedulerPort;
-import com.example.demo.application.shared.command.CreateCronJobCommand;
-import com.example.demo.application.shared.command.CreateOneTimeJobCommand;
-import com.example.demo.application.shared.command.RegisterJobCommand;
-import com.example.demo.application.shared.command.UpdateScheduleCommand;
+import com.example.demo.application.shared.command.inbound.CreateCronJobCommand;
+import com.example.demo.application.shared.command.inbound.CreateOneTimeJobCommand;
+import com.example.demo.application.shared.command.outbound.SyncJobToEngineCommand;
+import com.example.demo.application.shared.command.inbound.UpdateScheduleCommand;
 import com.example.demo.application.shared.exception.JobNotFoundException;
 import com.example.demo.application.shared.exception.ScheduleEngineException;
 import com.example.demo.application.domain.schedule.repository.ScheduledJobRepository;
@@ -48,30 +48,31 @@ class ScheduledJobApplicationServiceTest {
 		// Arrange
 		CreateCronJobCommand command = new CreateCronJobCommand("TestJob", "TestGroup", "testJobBean", "0 0 12 * * ?", null, true);
 		when(repository.findByNameAndGroup("TestJob", "TestGroup")).thenReturn(Optional.empty());
+		when(repository.save(any(ScheduledJob.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
 		// Act
 		applicationService.initializeCronTask(command);
 
 		// Assert
 		verify(repository, times(1)).save(any(ScheduledJob.class));
-		verify(jobScheduler, times(1)).add(any(RegisterJobCommand.class));
+		verify(jobScheduler, times(1)).add(any(SyncJobToEngineCommand.class));
 	}
 
 	@Test
 	@DisplayName("更新 Cron：當任務存在時，應更新領域實體狀態並同步至 Quartz，最後進行持久化")
 	void updateJobSchedule_ShouldUpdateAndSave_WhenJobExists() throws Exception {
 		// Arrange
-		UpdateScheduleCommand command = new UpdateScheduleCommand("TestJob", "TestGroup", "CRON", "0/5 * * * * ?", null);
 		ScheduledJob job = ScheduledJob.register("TestJob", "TestGroup", "testJobBean", ScheduleRule.cron("0 0 12 * * ?", true));
+		UpdateScheduleCommand command = new UpdateScheduleCommand(job.getJobId().value(), "CRON", "0/5 * * * * ?", null);
 		
-		when(repository.findByNameAndGroup("TestJob", "TestGroup")).thenReturn(Optional.of(job));
+		when(repository.findByJobId(job.getJobId())).thenReturn(Optional.of(job));
 
 		// Act
 		applicationService.updateJobSchedule(command);
 
 		// Assert
 		assertEquals("0/5 * * * * ?", job.getScheduleRule().getCronExpression());
-		verify(jobScheduler, times(1)).add(any(RegisterJobCommand.class));
+		verify(jobScheduler, times(1)).add(any(SyncJobToEngineCommand.class));
 		verify(repository, times(1)).save(job);
 	}
 
@@ -79,11 +80,11 @@ class ScheduledJobApplicationServiceTest {
 	@DisplayName("更新 Cron：當 Quartz 同步失敗時，應拋出 ScheduleEngineException，並避免持久化")
 	void updateJobSchedule_ShouldThrowScheduleEngineException_WhenQuartzFails() throws Exception {
 		// Arrange
-		UpdateScheduleCommand command = new UpdateScheduleCommand("TestJob", "TestGroup", "CRON", "0/5 * * * * ?", null);
 		ScheduledJob job = ScheduledJob.register("TestJob", "TestGroup", "testJobBean", ScheduleRule.cron("0 0 12 * * ?", true));
+		UpdateScheduleCommand command = new UpdateScheduleCommand(job.getJobId().value(), "CRON", "0/5 * * * * ?", null);
 		
-		when(repository.findByNameAndGroup("TestJob", "TestGroup")).thenReturn(Optional.of(job));
-		doThrow(new ScheduleEngineException("Update", "TestGroup", "TestJob", new RuntimeException("Quartz Error"))).when(jobScheduler).add(any(RegisterJobCommand.class));
+		when(repository.findByJobId(job.getJobId())).thenReturn(Optional.of(job));
+		doThrow(new ScheduleEngineException("Update", "TestGroup", "TestJob", new RuntimeException("Quartz Error"))).when(jobScheduler).add(any(SyncJobToEngineCommand.class));
 
 		// Act & Assert
 		assertThrows(ScheduleEngineException.class, () -> applicationService.updateJobSchedule(command));
@@ -145,3 +146,4 @@ class ScheduledJobApplicationServiceTest {
 		verify(repository, never()).save(any());
 	}
 }
+

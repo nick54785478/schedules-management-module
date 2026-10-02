@@ -1,4 +1,4 @@
-package com.example.demo.application.shared.command;
+package com.example.demo.application.shared.command.inbound;
 
 /**
  * 建立「定時排程任務 (Cron)」的指令 (Command)。
@@ -11,3 +11,4 @@ package com.example.demo.application.shared.command;
  */
 public record CreateCronJobCommand(String name, String group, String jobType, String cronExpression, String calendarKey, boolean requestsRecovery) {
 }
+

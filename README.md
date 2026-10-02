@@ -88,7 +88,7 @@
 
 **4. 更新排程執行時間**
 >* Method: PUT
->* Path: `/update-cron` 或 `/update-one-time`
+>* Path: `/{jobId}/update-cron` 或 `/{jobId}/update-one-time`
 >* 描述: 修改特定任務的執行週期 (Cron 或單次執行時間)。
 
 **5. 新增排程任務**
@@ -99,7 +99,7 @@
 
 **6. 綁定日曆 (排除假日)**
 >* Method: PUT
->* Path: `/bind-calendar`
+>* Path: `/{jobId}/bind-calendar`
 >* 描述: 為排程任務綁定日曆黑名單，傳入空字串或 null 可解除綁定。
 
 **7. 日曆黑名單管理 API**

@@ -1,10 +1,10 @@
 package com.example.demo.iface.rest;
 
 import com.example.demo.application.service.ScheduledJobApplicationService;
-import com.example.demo.application.shared.command.BindJobCalendarCommand;
-import com.example.demo.application.shared.command.CreateCronJobCommand;
-import com.example.demo.application.shared.command.CreateOneTimeJobCommand;
-import com.example.demo.application.shared.command.UpdateScheduleCommand;
+import com.example.demo.application.shared.command.inbound.BindJobCalendarCommand;
+import com.example.demo.application.shared.command.inbound.CreateCronJobCommand;
+import com.example.demo.application.shared.command.inbound.CreateOneTimeJobCommand;
+import com.example.demo.application.shared.command.inbound.UpdateScheduleCommand;
 import com.example.demo.application.shared.view.PageGottenView;
 import com.example.demo.application.shared.view.ScheduleJobGottenView;
 import com.example.demo.iface.dto.req.BindJobCalendarResource;
@@ -73,9 +73,9 @@ public class ScheduleJobController {
      * 綁定或解除綁定排程任務的日曆
      */
     @Operation(summary = "綁定或解除綁定排程日曆", description = "為現有的排程任務綁定指定的日曆黑名單（傳入 null 或空字串表示解除綁定）")
-    @PutMapping("/bind-calendar")
-    public ResponseEntity<JobCalendarBoundResource> bindJobCalendar(@Valid @RequestBody BindJobCalendarResource request) {
-        BindJobCalendarCommand command = new BindJobCalendarCommand(request.name(), request.group(), request.calendarKey());
+    @PutMapping("/{jobId}/bind-calendar")
+    public ResponseEntity<JobCalendarBoundResource> bindJobCalendar(@PathVariable("jobId") String jobId, @Valid @RequestBody BindJobCalendarResource request) {
+        BindJobCalendarCommand command = new BindJobCalendarCommand(jobId, request.calendarKey());
         applicationService.bindCalendar(command);
         return ResponseEntity.ok(new JobCalendarBoundResource("200", "排程任務日曆綁定更新成功"));
     }
@@ -117,9 +117,9 @@ public class ScheduleJobController {
      * 更新 Cron 排程執行時間
      */
     @Operation(summary = "更新 Cron 排程執行時間", description = "修改指定 Cron 排程的執行週期")
-    @PutMapping("/update-cron")
-    public ResponseEntity<JobCronUpdatedResource> updateCron(@Valid @RequestBody UpdateCronJobResource request) {
-        UpdateScheduleCommand command = new UpdateScheduleCommand(request.name(), request.group(), "CRON", request.newCron(), null);
+    @PutMapping("/{jobId}/update-cron")
+    public ResponseEntity<JobCronUpdatedResource> updateCron(@PathVariable("jobId") String jobId, @Valid @RequestBody UpdateCronJobResource request) {
+        UpdateScheduleCommand command = new UpdateScheduleCommand(jobId, "CRON", request.newCron(), null);
         applicationService.updateJobSchedule(command);
         return ResponseEntity.ok(new JobCronUpdatedResource("200", "更新 Cron 排程成功"));
     }
@@ -128,14 +128,15 @@ public class ScheduleJobController {
      * 更新單次排程執行時間
      */
     @Operation(summary = "更新單次排程執行時間", description = "修改指定單次排程的執行時間")
-    @PutMapping("/update-one-time")
-    public ResponseEntity<JobCronUpdatedResource> updateOneTime(@Valid @RequestBody UpdateOneTimeJobResource request) {
+    @PutMapping("/{jobId}/update-one-time")
+    public ResponseEntity<JobCronUpdatedResource> updateOneTime(@PathVariable("jobId") String jobId, @Valid @RequestBody UpdateOneTimeJobResource request) {
         LocalDate date = LocalDate.parse(request.executeDate(), DateTimeFormatter.ofPattern("yyyy/MM/dd"));
         LocalTime time = LocalTime.parse(request.executeTime(), DateTimeFormatter.ofPattern("HH:mm"));
         LocalDateTime executeDateTime = LocalDateTime.of(date, time);
         
-        UpdateScheduleCommand command = new UpdateScheduleCommand(request.name(), request.group(), "ONE_TIME", null, executeDateTime);
+        UpdateScheduleCommand command = new UpdateScheduleCommand(jobId, "ONE_TIME", null, executeDateTime);
         applicationService.updateJobSchedule(command);
         return ResponseEntity.ok(new JobCronUpdatedResource("200", "更新單次排程成功"));
     }
 }
+

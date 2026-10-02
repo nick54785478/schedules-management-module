@@ -2,7 +2,7 @@ package com.example.demo.config.registration;
 
 import com.example.demo.application.port.JobSchedulerPort;
 import com.example.demo.application.service.ScheduledJobApplicationService;
-import com.example.demo.application.shared.command.CreateCronJobCommand;
+import com.example.demo.application.shared.command.inbound.CreateCronJobCommand;
 import com.example.demo.infra.quartz.listener.global.GlobalJobListener;
 import com.example.demo.infra.quartz.listener.global.PersistJobLogListener;
 import com.example.demo.infra.quartz.listener.impl.MessagePrintJobListener;

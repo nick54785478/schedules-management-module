@@ -23,7 +23,7 @@ import org.quartz.Trigger;
 import org.springframework.context.ApplicationContext;
 
 import com.example.demo.application.domain.schedule.aggregate.vo.ScheduleRule;
-import com.example.demo.application.shared.command.RegisterJobCommand;
+import com.example.demo.application.shared.command.outbound.SyncJobToEngineCommand;
 
 @ExtendWith(MockitoExtension.class)
 class JobSchedulerAdapterTest {
@@ -48,13 +48,13 @@ class JobSchedulerAdapterTest {
 	@DisplayName("新增任務：應動態向 ApplicationContext 查詢型別並向 Scheduler 註冊")
 	void add_ShouldCreateJobAndTriggerAndSchedule() throws Exception {
 		// Arrange
-		RegisterJobCommand cmd = new RegisterJobCommand("TestJob", "TestGroup", ScheduleRule.cron("0 0 12 * * ?", true), "dummyJobBean", true);
+		SyncJobToEngineCommand command = new SyncJobToEngineCommand("TestJob", "TestGroup", "dummyJobBean", ScheduleRule.cron("0 0 12 * * ?", true));
 		
 		// 模擬 Spring 容器回傳 Bean 的型別
 		doReturn(DummyJob.class).when(applicationContext).getType("dummyJobBean");
 
 		// Act
-		adapter.add(cmd);
+		adapter.add(command);
 
 		// Assert
 		ArgumentCaptor<JobDetail> jobDetailCaptor = ArgumentCaptor.forClass(JobDetail.class);
@@ -78,11 +78,11 @@ class JobSchedulerAdapterTest {
 	@DisplayName("例外處理：當指定的 Bean Name 不存在於 Spring 容器時，應阻斷註冊")
 	void add_ShouldThrowException_WhenBeanNotFound() {
 		// Arrange
-		RegisterJobCommand cmd = new RegisterJobCommand("TestJob", "TestGroup", ScheduleRule.cron("0 0 12 * * ?", true), "invalidBean", true);
+		SyncJobToEngineCommand command = new SyncJobToEngineCommand("TestJob", "TestGroup", "invalidBean", ScheduleRule.cron("0 0 12 * * ?", true));
 		when(applicationContext.getType("invalidBean")).thenThrow(new RuntimeException("No bean found"));
 
 		// Act & Assert
-		RuntimeException exception = assertThrows(RuntimeException.class, () -> adapter.add(cmd));
+		RuntimeException exception = assertThrows(RuntimeException.class, () -> adapter.add(command));
 		assertTrue(exception.getMessage().contains("系統無法在 Spring 容器中找到對應的 Job 標識: invalidBean"));
 	}
 
@@ -96,3 +96,4 @@ class JobSchedulerAdapterTest {
 		verify(scheduler, times(1)).pauseJob(JobKey.jobKey("TestJob", "TestGroup"));
 	}
 }
+

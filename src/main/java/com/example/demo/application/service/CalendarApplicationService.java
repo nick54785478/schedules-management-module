@@ -5,8 +5,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.example.demo.application.domain.calendar.aggregate.ScheduleCalendar;
 import com.example.demo.application.port.JobSchedulerPort;
-import com.example.demo.application.shared.command.AddExcludedDateCommand;
-import com.example.demo.application.shared.command.CreateCalendarCommand;
+import com.example.demo.application.shared.command.outbound.SyncCalendarToEngineCommand;
+import com.example.demo.application.shared.command.inbound.AddExcludedDateCommand;
+import com.example.demo.application.shared.command.inbound.CreateCalendarCommand;
 import com.example.demo.application.domain.calendar.repository.ScheduleCalendarRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -44,7 +45,7 @@ public class CalendarApplicationService {
         ScheduleCalendar calendar = ScheduleCalendar.create(command.key(), command.description());
         repository.save(calendar);
 
-        jobScheduler.syncCalendar(calendar);
+        jobScheduler.syncCalendar(new SyncCalendarToEngineCommand(calendar.getKey(), calendar.getExcludedDates()));
     }
 
     /**
@@ -58,7 +59,7 @@ public class CalendarApplicationService {
         calendar.addExcludedDate(command.excludedDate());
         repository.save(calendar);
 
-        jobScheduler.syncCalendar(calendar); // 更新 Quartz 內的日曆
+        jobScheduler.syncCalendar(new SyncCalendarToEngineCommand(calendar.getKey(), calendar.getExcludedDates())); // 更新 Quartz 內的日曆
     }
 
     /**
@@ -72,7 +73,7 @@ public class CalendarApplicationService {
         calendar.removeExcludedDate(date);
         repository.save(calendar);
 
-        jobScheduler.syncCalendar(calendar); // 更新 Quartz 內的日曆
+        jobScheduler.syncCalendar(new SyncCalendarToEngineCommand(calendar.getKey(), calendar.getExcludedDates())); // 更新 Quartz 內的日曆
     }
 
     /**
@@ -103,3 +104,4 @@ public class CalendarApplicationService {
                 .map(cal -> new ScheduleCalendarView(cal.getId(), cal.getKey(), cal.getDescription(), cal.getExcludedDates()));
     }
 }
+
