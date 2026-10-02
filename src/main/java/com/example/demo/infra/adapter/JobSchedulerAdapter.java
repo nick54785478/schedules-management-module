@@ -32,7 +32,7 @@ import org.springframework.stereotype.Component;
 import com.example.demo.application.port.JobSchedulerPort;
 import com.example.demo.application.shared.command.RegisterJobCommand;
 import com.example.demo.application.shared.command.UpdateScheduleCommand;
-import com.example.demo.application.shared.view.ScheduleJobView;
+import com.example.demo.application.shared.view.ScheduleJobGottenView;
 import com.example.demo.application.shared.listener.JobStatusListener;
 
 import lombok.RequiredArgsConstructor;
@@ -126,9 +126,9 @@ class JobSchedulerAdapter implements JobSchedulerPort {
 	 * </p>
 	 */
 	@Override
-	public List<ScheduleJobView> findAll() {
+	public List<ScheduleJobGottenView> findAll() {
 		try {
-			List<ScheduleJobView> jobList = new ArrayList<>();
+			List<ScheduleJobGottenView> jobList = new ArrayList<>();
 	
 			// 獲取所有群組中的所有 JobKey
 			Set<JobKey> jobKeys = scheduler.getJobKeys(GroupMatcher.anyJobGroup());
@@ -144,7 +144,7 @@ class JobSchedulerAdapter implements JobSchedulerPort {
 	
 				for (Trigger trigger : triggers) {
 					// 構建基礎運行時資訊
-					ScheduleJobView jobInfo = ScheduleJobView.builder().name(jobKey.getName()).group(jobKey.getGroup())
+					ScheduleJobGottenView jobInfo = ScheduleJobGottenView.builder().name(jobKey.getName()).group(jobKey.getGroup())
 							.nextFireTime(trigger.getNextFireTime())
 							.state(scheduler.getTriggerState(trigger.getKey()).name()).build();
 	
@@ -247,7 +247,7 @@ class JobSchedulerAdapter implements JobSchedulerPort {
 	 * 輔助方法：根據 Trigger 具體類型解析技術細節。 對於 CronTrigger，會計算相鄰執行點的差值以估算平均執行頻率。
 	 * </p>
 	 */
-	private void processTriggerData(ScheduleJobView jobInfo, Trigger trigger) {
+	private void processTriggerData(ScheduleJobGottenView jobInfo, Trigger trigger) {
 		String triggerType = "Unknown";
 		Integer intervalInSeconds = null;
 

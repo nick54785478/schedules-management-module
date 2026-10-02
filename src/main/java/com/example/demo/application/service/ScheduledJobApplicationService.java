@@ -15,7 +15,7 @@ import com.example.demo.application.shared.exception.InvalidCronException;
 import com.example.demo.application.shared.exception.JobNotFoundException;
 import com.example.demo.application.shared.exception.ScheduleEngineException;
 import com.example.demo.application.shared.view.PageGottenView;
-import com.example.demo.application.shared.view.ScheduleJobView;
+import com.example.demo.application.shared.view.ScheduleJobGottenView;
 import com.example.demo.application.domain.schedule.repository.ScheduledJobRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -195,24 +195,24 @@ public class ScheduledJobApplicationService {
      *
      * @return 整合後的視圖清單，包含領域狀態與引擎即時狀態
      */
-    public PageGottenView<ScheduleJobView> getJobInfoResources(int page, int size) {
+    public PageGottenView<ScheduleJobGottenView> getJobInfoResources(int page, int size) {
         // 1. 取得 Master Data (DB) - 使用分頁
         Page<ScheduledJob> dbJobsPage = repository.findAll(PageRequest.of(page, size));
         List<ScheduledJob> dbJobs = dbJobsPage.getContent();
 
         // 2. 取得 Runtime Data (Quartz) - 具備 Try-Catch 降級保護
-        List<ScheduleJobView> quartzJobs = getQuartzJobsSafe();
+        List<ScheduleJobGottenView> quartzJobs = getQuartzJobsSafe();
 
         // 3. 建立快取地圖
-        Map<String, ScheduleJobView> quartzMap = quartzJobs.stream()
+        Map<String, ScheduleJobGottenView> quartzMap = quartzJobs.stream()
                 .collect(Collectors.toMap(j -> j.getName() + "-" + j.getGroup(), j -> j, (exist, replace) -> exist));
 
         // 4. 數據聚合
-        List<ScheduleJobView> viewList = dbJobs.stream().map(dbJob -> {
+        List<ScheduleJobGottenView> viewList = dbJobs.stream().map(dbJob -> {
             String key = dbJob.getName() + "-" + dbJob.getGroup();
-            ScheduleJobView qView = quartzMap.get(key);
+            ScheduleJobGottenView qView = quartzMap.get(key);
 
-            ScheduleJobView.ScheduleJobViewBuilder builder = ScheduleJobView.builder().jobId(dbJob.getJobId().value())
+            ScheduleJobGottenView.ScheduleJobGottenViewBuilder builder = ScheduleJobGottenView.builder().jobId(dbJob.getJobId().value())
                     .name(dbJob.getName()).group(dbJob.getGroup()).jobType(dbJob.getJobType())
                     .domainStatus(dbJob.getStatus().name())
                     .cronExpression(dbJob.getScheduleRule().getType() == ScheduleType.CRON ? dbJob.getScheduleRule().getCronExpression() : dbJob.getScheduleRule().getExecuteTime().toString());
@@ -280,7 +280,7 @@ public class ScheduledJobApplicationService {
     /**
      * 安全獲取 Quartz 運行數據。 當引擎發生通訊異常或資料庫鎖定時，回傳空清單以觸發降級邏輯。
      */
-    private List<ScheduleJobView> getQuartzJobsSafe() {
+    private List<ScheduleJobGottenView> getQuartzJobsSafe() {
         try {
             return jobScheduler.findAll();
         } catch (ScheduleEngineException e) {

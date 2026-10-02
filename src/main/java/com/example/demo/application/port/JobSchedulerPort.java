@@ -9,7 +9,7 @@ import com.example.demo.application.shared.exception.ScheduleEngineException;
 
 import com.example.demo.application.shared.command.RegisterJobCommand;
 import com.example.demo.application.shared.command.UpdateScheduleCommand;
-import com.example.demo.application.shared.view.ScheduleJobView;
+import com.example.demo.application.shared.view.ScheduleJobGottenView;
 import com.example.demo.application.shared.listener.JobStatusListener;
 
 /**
@@ -62,7 +62,7 @@ public interface JobSchedulerPort {
 	 * @return 包含任務運行資訊的視圖清單
 	 * @throws ScheduleEngineException 當查詢運行狀態失敗時拋出
 	 */
-	List<ScheduleJobView> findAll() throws ScheduleEngineException;
+	List<ScheduleJobGottenView> findAll() throws ScheduleEngineException;
 
 	/**
 	 * 將領域層的日曆同步至底層 Quartz 引擎

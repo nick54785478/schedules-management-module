@@ -6,7 +6,7 @@ import com.example.demo.application.shared.command.CreateCronJobCommand;
 import com.example.demo.application.shared.command.CreateOneTimeJobCommand;
 import com.example.demo.application.shared.command.UpdateScheduleCommand;
 import com.example.demo.application.shared.view.PageGottenView;
-import com.example.demo.application.shared.view.ScheduleJobView;
+import com.example.demo.application.shared.view.ScheduleJobGottenView;
 import com.example.demo.iface.dto.req.BindJobCalendarResource;
 import com.example.demo.iface.dto.req.CreateCronJobResource;
 import com.example.demo.iface.dto.req.CreateOneTimeJobResource;
@@ -108,7 +108,7 @@ public class ScheduleJobController {
     public ResponseEntity<PagedJobStatusSearchedResource> searchJobStatus(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
-        PageGottenView<ScheduleJobView> data = applicationService.getJobInfoResources(page, size);
+        PageGottenView<ScheduleJobGottenView> data = applicationService.getJobInfoResources(page, size);
         return new ResponseEntity<>(new PagedJobStatusSearchedResource("200",
                 "Success", data), HttpStatus.OK);
     }

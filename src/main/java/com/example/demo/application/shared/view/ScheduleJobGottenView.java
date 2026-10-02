@@ -14,7 +14,7 @@ import lombok.Data;
 @Data
 @Builder
 @Schema(description = "排程任務視圖 (包含領域狀態與運行狀態)")
-public class ScheduleJobView {
+public class ScheduleJobGottenView {
 
 	// ### 來自 DB 的資料 ###
 	@Schema(description = "領域唯一識別碼 (JobId)")
