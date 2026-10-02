@@ -1,4 +1,4 @@
-package com.example.demo.iface.handler;
+package com.example.demo.iface.exception;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.ExceptionHandler;
