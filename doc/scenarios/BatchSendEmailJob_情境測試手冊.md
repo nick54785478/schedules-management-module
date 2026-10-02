@@ -36,7 +36,7 @@
   "name": "EmailJob",
   "group": "TestGroup",
   "jobType": "batchSendEmailJob",
-  "executeDate": "2026/10/1",
+  "executeDate": "2026/10/01",
   "executeTime": "23:59",
   "requestsRecovery": true
 }

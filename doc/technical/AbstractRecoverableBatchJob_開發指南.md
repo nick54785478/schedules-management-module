@@ -87,3 +87,11 @@ public class MyExternalSyncJob extends AbstractRecoverableBatchJob {
 **解決方案**：
 這個公版框架完美適用於任何需要大量拋轉的場景，但您必須確保接收方（外部系統）的 API 是**冪等的 (Idempotent)**。
 例如：外部系統能根據 `RequestId` 或 `Data ID` 判斷資料是否已經存在，若是重複呼叫則自動略過或採用 `UPSERT` 覆蓋。只要滿足這點，框架就能為您帶來完美無痛的斷點續傳體驗！
+
+### 3.3 非批次任務 (單次執行) 的冪等性考量
+
+針對「不批次」的任務（例如：單純的發送一次通知、執行一次資料庫結算），即便您不繼承 `AbstractRecoverableBatchJob` 而是直接實作原生的 `QuartzJobBean`，在開啟災後重跑 (`requestsRecovery=true`) 的情況下，**依然面臨一模一樣的「冪等性」挑戰**。
+
+* **不會失效**：如果您將非批次的任務繼承 `AbstractRecoverableBatchJob`（把總步數設為 1），它一樣能完美運作。當唯一的步驟執行到一半當機，另一台機器接手時，因為 Checkpoint 仍為 0，所以會**重跑這唯一的一步**。
+* **為什麼要注意？**：如果您的單一步驟是呼叫外部 API 寄信，信剛寄出伺服器就當機了，這時 Quartz 的狀態還沒更新，接手的機器就會再寄一次，導致使用者收到兩封信。
+* **最佳實踐**：對於不需要分批的任務，直接繼承原生的 `QuartzJobBean` 即可。但只要有操作外部系統（寄信、推播、金流），強烈建議對方 API 必須具備防呆機制（如根據 RequestId 阻擋重複請求）；若是對內部資料庫的操作，則可以善用關聯式資料庫的 Transaction 機制來達成絕對的資料一致。

@@ -33,7 +33,7 @@
   "name": "TestRecoveryJob",
   "group": "TestGroup",
   "jobType": "failoverSimulationJob",
-  "executeDate": "2026/10/1",
+  "executeDate": "2026/10/01",
   "executeTime": "23:31",
   "requestsRecovery": true
 }
