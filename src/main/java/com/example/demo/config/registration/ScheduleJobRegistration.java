@@ -41,6 +41,19 @@ public class ScheduleJobRegistration {
     private final PersistJobLogListener persistJobLogListener; // 持久化日誌監聽器
     private final ScheduledJobApplicationService applicationService;
 
+    /**
+     * <h2>系統初始化啟動點</h2>
+     * <p>
+     * 當 Spring 容器啟動完成 (ApplicationReadyEvent) 時，自動觸發此方法。
+     * 此方法主要執行兩大核心工作：
+     * <ol>
+     * <li><b>註冊監聽器 (Listeners)：</b> 向底層 Quartz 引擎掛載全域或針對特定任務的監聽器，確保稽核紀錄與特殊業務邏輯能被正確攔截處理。</li>
+     * <li><b>初始化核心系統任務 (System Jobs)：</b> 確保應用程式啟動時，預設必須執行的核心排程能同步寫入至資料庫與 Quartz 引擎中。</li>
+     * </ol>
+     * </p>
+     * 
+     * @throws Exception 當監聽器註冊失敗，或向執行引擎註冊排程失敗時拋出例外
+     */
     @EventListener(ApplicationReadyEvent.class)
     public void init() throws Exception {
 
