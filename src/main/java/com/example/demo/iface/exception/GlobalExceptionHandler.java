@@ -11,6 +11,7 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 import com.example.demo.application.port.CronParserPort;
 import com.example.demo.application.shared.exception.InvalidCronException;
 import com.example.demo.application.shared.exception.JobNotFoundException;
+import com.example.demo.application.shared.exception.JobAlreadyExistsException;
 import com.example.demo.application.shared.exception.ScheduleEngineException;
 import com.example.demo.application.shared.exception.CalendarSyncException;
 
@@ -48,6 +49,21 @@ public class GlobalExceptionHandler {
 	@ResponseStatus(HttpStatus.NOT_FOUND)
 	public ErrorResponse handleJobNotFound(JobNotFoundException e) {
 		return new ErrorResponse("JOB_NOT_FOUND", e.getMessage());
+	}
+
+	/**
+	 * 處理資源已存在異常 (HTTP 409)。
+	 * <p>
+	 * 適用情境：當指定的 Job 已經存在於資料庫中，拒絕重複建立。
+	 * </p>
+	 * 
+	 * @param e {@link JobAlreadyExistsException}
+	 * @return 包含錯誤代碼與詳細訊息的物件
+	 */
+	@ExceptionHandler(JobAlreadyExistsException.class)
+	@ResponseStatus(HttpStatus.CONFLICT)
+	public ErrorResponse handleJobAlreadyExists(JobAlreadyExistsException e) {
+		return new ErrorResponse("JOB_ALREADY_EXISTS", e.getMessage());
 	}
 
 	/**

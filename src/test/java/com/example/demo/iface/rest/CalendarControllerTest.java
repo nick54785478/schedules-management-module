@@ -57,6 +57,27 @@ class CalendarControllerTest {
     }
 
     @Test
+    @DisplayName("GET /api/calendars - 應成功回傳分頁的日曆清單")
+    void getAllCalendars_ShouldReturnPagedList() throws Exception {
+        com.example.demo.application.shared.view.PageGottenView<ScheduleCalendarView> mockPage = new com.example.demo.application.shared.view.PageGottenView<>(
+                List.of(new ScheduleCalendarView(UUID.randomUUID(), "TAIWAN_HOLIDAY", "台灣國定假日", Set.of())),
+                0, 10, 1L, 1
+        );
+
+        when(applicationService.findAllCalendars(0, 10)).thenReturn(mockPage);
+
+        mockMvc.perform(get("/api/calendars")
+                .param("page", "0")
+                .param("size", "10")
+                .accept(MediaType.APPLICATION_JSON))
+                .andDo(print())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].key").value("TAIWAN_HOLIDAY"));
+
+        verify(applicationService, times(1)).findAllCalendars(0, 10);
+    }
+
+    @Test
     @DisplayName("GET /api/calendars/{id}/holidays - 應成功回傳該日曆的排除日期清單")
     void getCalendarHolidays_ShouldReturnList() throws Exception {
         // Arrange

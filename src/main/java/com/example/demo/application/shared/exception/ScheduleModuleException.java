@@ -3,6 +3,7 @@ package com.example.demo.application.shared.exception;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
+import lombok.NoArgsConstructor;
 
 /**
  * 基礎模組異常
@@ -19,5 +20,8 @@ public class ScheduleModuleException extends RuntimeException {
 
 	public ScheduleModuleException(String message, Throwable cause) {
 		super(message, cause);
+	}
+
+	public ScheduleModuleException(String format) {
 	}
 }

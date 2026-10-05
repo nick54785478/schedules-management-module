@@ -80,14 +80,14 @@ public class ScheduledJobApplicationService {
     public void initializeOneTimeTask(CreateOneTimeJobCommand command) {
         ScheduledJob job = repository.findByNameAndGroup(command.name(), command.group()).orElse(null);
 
-        if (job == null) {
-            log.info("初始化新一次性排程紀錄: {} - {}", command.name(), command.group());
-            ScheduleRule rule = createScheduleRule(ScheduleType.ONE_TIME.name(), null, command.executeTime(), null, command.requestsRecovery());
-            job = ScheduledJob.register(command.name(), command.group(), command.jobType(), rule);
-            job = repository.save(job);
-        } else {
-            log.info("排程配置已存在，準備執行引擎同步: {}", command.name());
+        if (job != null) {
+            throw new com.example.demo.application.shared.exception.JobAlreadyExistsException(command.name(), command.group());
         }
+
+        log.info("初始化新一次性排程紀錄: {} - {}", command.name(), command.group());
+        ScheduleRule rule = createScheduleRule(ScheduleType.ONE_TIME.name(), null, command.executeTime(), null, command.requestsRecovery());
+        job = ScheduledJob.register(command.name(), command.group(), command.jobType(), rule);
+        job = repository.save(job);
 
         jobScheduler.add(new SyncJobToEngineCommand(job.getName(), job.getGroup(), job.getJobType(), job.getScheduleRule()));
     }
