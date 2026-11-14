@@ -1,6 +1,47 @@
 # 分散式排程任務管理模組 (Schedules Management Module)
 
-本模組基於 **Spring Boot 4.0.6** 與 **Quartz Scheduler 2.5.2** 構建，定位為**嵌入式技術基礎設施模組 (Embedded Technical Infrastructure Module)**。它旨在為未來的各項微服務提供一套高可用、具備事務強一致性且遵循 **Clean Architecture（六角架構 / Ports and Adapters）** 的排程調度核心基底。
+## 📌 模組簡介與核心定位 (Module Overview & Positioning)
+
+**schedules-management-module** 是一套專為企業級微服務架構與分散式系統打造的**「嵌入式排程調度基礎設施模組 (Embedded Technical Infrastructure Module)」**。
+
+### 為什麼需要此模組？（解決什麼痛點）
+在典型的 Spring Boot 應用中，開發者常依賴 `@Scheduled` 註解處理定時任務。然而在多實例、分散式或微服務架構下，原生作法往往面臨以下痛點：
+1. **叢集並行衝突 (Concurrency Conflict)**：多個服務節點同時啟動時，同一排程會在每一台節點重複觸發，導致資料重複處理、庫存超扣或寄送重複郵件。
+2. **缺乏動態管控 (Inflexible Operations)**：排程週期寫死於原始碼或設定檔中，任何時間調整或任務的暫停/重啟，都必須重啟服務甚至重新打包編譯。
+3. **單點故障與長時批次停擺 (Failover & Recovery Gap)**：長時批次任務（如大宗資料同步、百萬用戶通知）若執行到一半時節點崩潰 (Crash)，整批任務直接中斷，且重啟後必須從第一筆從頭重跑，缺乏進度續跑機制。
+4. **排程與業務事務脫節 (Data Inconsistency)**：排程引擎操作與業務資料庫不在同一個事務中，易產生「資料庫已存檔但排程未註冊成功」，或是「排程已觸發但資料庫操作拋錯」的狀態偏差。
+
+### 本模組的核心價值與關鍵能力
+本模組旨在成為各項業務微服務底層開箱即用的排程基底，引入本模組即可**零負擔獲得企業級排程能力**：
+- 🔄 **全生命週期動態調度**：免重啟系統，支援透過 REST API 或應用層 Inbound Port 動態註冊、更新時間、暫停、重啟定時 (Cron) 與單次 (OneTime) 排程，並支援多維度條件篩選。
+- 🛡️ **分散式叢集高可用 (HA)**：基於資料庫層級分散式行鎖機制，多節點自動搶占執行權，杜絕重複執行，並具備節點故障自動轉移 (Failover) 能力。
+- ⏱️ **長時批次斷點續跑 (Checkpoint Recovery)**：提供公版抽象模板，任務分步自動保存檢查點；當執行節點崩潰時，容錯節點接管後**直接從中斷點接續執行**，無需從頭再來。
+- 📅 **全域排程日曆 (Calendar Blacklist)**：獨立日曆黑名單管理，支援排除國定假日或彈性休假，排程任務可動態綁定或解綁。
+- 🔒 **雙向事務強一致性 (ACID)**：採用共享資料源 (Shared DataSource) 策略，業務表與 Quartz 表共用同一個連線事務，異動失敗同步回滾，杜絕狀態不一致。
+- 🏛️ **純粹六角架構 (Hexagonal Clean Architecture)**：嚴守 Inbound / Outbound Port 設計，將排程技術（Quartz）與 ORM 實體徹底隔絕在基礎設施層，業務微服務只需呼叫清晰的 UseCase 介面。
+
+---
+
+## 🛠️ 使用技術與框架說明 (Tech Stack & Technologies)
+
+本模組精選現代 Java 生態系中頂尖、穩定且具備長期支援能力的技術堆疊構建：
+
+| 領域分類 | 技術 / 框架 | 版本 | 用途與職責說明 |
+| :--- | :--- | :---: | :--- |
+| **開發語言** | **Java** | `21 (LTS)` | 使用最新 LTS 版本，運用 Record 純資料模型、Pattern Matching 與現代化語言特性 |
+| **核心框架** | **Spring Boot** | `4.0.6` | 現代化微服務與模組基礎容器，提供自動配置、元件掃描與生命週期管理 |
+| **排程引擎** | **Quartz Scheduler** | `2.5.2` | 企業級分散式排程調度核心，負責 Trigger 觸發、Job 實例調度與叢集心跳檢測 |
+| **資料持久化** | **Spring Data JPA** | `4.0.6` | 基於 Hibernate 的資料庫存取層，提供 Repository 抽象與 Criteria API 動態條件過濾 |
+| **ORM 實現** | **Hibernate ORM** | `7.x` | 負責底層物件關聯映射、JPA Auditing 自動時間戳與資料庫綱要維護 |
+| **關聯式資料庫** | **MySQL** | `8.x` | 生產環境資料庫，儲存業務排程模型 (`schedule_*`) 與 Quartz 系統表 (`QRTZ_*`) |
+| **測試資料庫** | **H2 Database** | `Runtime` | 本機輕量化快速開發與單元/整合測試使用的記憶體資料庫 |
+| **併發與鎖定** | **Quartz JDBC JobStore (TX)** | - | 透過 MySQL 行級排他鎖 (`SELECT ... FOR UPDATE`) 實現叢集多節點的互斥競爭 |
+| **API 文檔** | **SpringDoc OpenAPI (Swagger UI)**| `3.1.1` | 遵循 OpenAPI 3 規範，提供 `/swagger-ui.html` 互動式 API 測試與即時接口文檔 |
+| **參數檢核** | **Jakarta Validation** | `3.1.x` | 表現層請求輸入防呆檢核 (`@Valid`, `@NotBlank`, `@Pattern` 等) |
+| **開發輔助** | **Lombok** | `1.18.x` | 精簡 POJO 樣板程式碼、依賴注入構造器 (`@RequiredArgsConstructor`) 與日誌宣告 |
+| **單元測試** | **JUnit 5 (Jupiter)** | `5.11.x` | 現代化 Java 單元測試標準框架，支援生命週期鉤子與參數化測試 |
+| **Mock 框架** | **Mockito** | `5.14.x` | 支援六角架構各層 Port 的解耦 Mock 隔離測試 (啟用 inline-mock-maker) |
+| **Web 測試** | **Spring Boot WebMvcTest** | `4.0.6` | 針對表現層 REST Controller 進行 HTTP 請求與 JSONPath 斷言驗證 |
 
 ---
 
@@ -31,6 +72,7 @@
 |  [shared/] Pure Data Contracts (零外部技術侵入)                                   |
 |    - vo/: JobId, JobStatus, ScheduleType, CronExpression, ScheduleRule           |
 |    - model/: ScheduledJobModel, ScheduleCalendarModel                             |
+|    - query/: GetScheduleJobQuery                                                  |
 |    - command/: Inbound / Outbound Commands                                        |
 |    - view/: ScheduleJobGottenView, ScheduleCalendarView, PageGottenView          |
 |    - exception/: JobNotFoundException, CalendarNotFoundException, etc.            |
