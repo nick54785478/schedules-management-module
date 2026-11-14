@@ -28,6 +28,7 @@ import com.example.demo.application.shared.command.inbound.BindJobCalendarComman
 import com.example.demo.application.shared.command.inbound.CreateCronJobCommand;
 import com.example.demo.application.shared.command.inbound.CreateOneTimeJobCommand;
 import com.example.demo.application.shared.command.inbound.UpdateScheduleCommand;
+import com.example.demo.application.shared.query.GetScheduleJobQuery;
 import com.example.demo.application.shared.view.PageGottenView;
 import com.example.demo.application.shared.view.ScheduleJobGottenView;
 
@@ -164,6 +165,13 @@ class ScheduleJobControllerTest {
         verify(updateScheduleJobUseCase, times(1)).updateJobSchedule(any(UpdateScheduleCommand.class));
     }
 
+    /**
+     * Feature: 查詢系統內所有排程狀態
+     * Scenario: 成功依預設分頁查詢任務列表
+     * Given 系統存在排程任務
+     * When 發送 GET /jobs/status 帶入 page=0, size=10
+     * Then 回傳 200 OK 且包含正確的任務清單
+     */
     @Test
     @DisplayName("GET /jobs/status - 應回傳分頁任務清單")
     void searchJobStatus_ShouldReturnPagedList() throws Exception {
@@ -180,7 +188,7 @@ class ScheduleJobControllerTest {
                 0, 10, 1L, 1
         );
 
-        when(getScheduleJobUseCase.getJobInfoResources(0, 10)).thenReturn(mockPage);
+        when(getScheduleJobUseCase.getJobInfoResources(any(GetScheduleJobQuery.class))).thenReturn(mockPage);
 
         mockMvc.perform(get("/jobs/status")
                 .param("page", "0")
@@ -190,6 +198,44 @@ class ScheduleJobControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.content[0].name").value("TestJob"));
 
-        verify(getScheduleJobUseCase, times(1)).getJobInfoResources(0, 10);
+        verify(getScheduleJobUseCase, times(1)).getJobInfoResources(any(GetScheduleJobQuery.class));
+    }
+
+    /**
+     * Feature: 查詢系統內排程狀態附帶多維度條件過濾
+     * Scenario: 成功根據 status, jobType, jobGroup, scheduleType 進行動態篩選
+     * Given 系統中存在特定狀態之任務
+     * When 發送 GET /jobs/status 附帶各項篩選條件
+     * Then 調用 UseCase 傳入相應封裝之 Query 物件，並回傳 200 OK
+     */
+    @Test
+    @DisplayName("GET /jobs/status - 附帶多維度條件過濾應正確傳遞參數並回傳 200")
+    void searchJobStatus_WithFilters_ShouldPassQueryParameters() throws Exception {
+        PageGottenView<ScheduleJobGottenView> mockEmptyPage = new PageGottenView<>(
+                List.of(), 0, 10, 0L, 0
+        );
+
+        when(getScheduleJobUseCase.getJobInfoResources(any(GetScheduleJobQuery.class))).thenReturn(mockEmptyPage);
+
+        mockMvc.perform(get("/jobs/status")
+                .param("page", "0")
+                .param("size", "10")
+                .param("status", "NORMAL")
+                .param("jobType", "testJobBean")
+                .param("jobGroup", "TestGroup")
+                .param("scheduleType", "CRON")
+                .accept(MediaType.APPLICATION_JSON))
+                .andDo(print())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("200"));
+
+        verify(getScheduleJobUseCase, times(1)).getJobInfoResources(argThat(query ->
+                query.page() == 0
+                        && query.size() == 10
+                        && query.status() == com.example.demo.application.shared.vo.JobStatus.NORMAL
+                        && "testJobBean".equals(query.jobType())
+                        && "TestGroup".equals(query.jobGroup())
+                        && query.scheduleType() == com.example.demo.application.shared.vo.ScheduleType.CRON
+        ));
     }
 }

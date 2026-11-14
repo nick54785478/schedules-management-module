@@ -320,7 +320,7 @@ erDiagram
 | `PUT` | `/jobs/{jobId}/bind-calendar` | `BindJobCalendarUseCase` | `schedule_job`, `QRTZ_TRIGGERS` |
 | `POST` | `/jobs/pause/{jobId}` | `PauseScheduleJobUseCase` | `schedule_job`, `QRTZ_TRIGGERS` |
 | `POST` | `/jobs/resume/{jobId}` | `ResumeScheduleJobUseCase` | `schedule_job`, `QRTZ_TRIGGERS` |
-| `GET` | `/jobs/status` | `GetScheduleJobUseCase` | `schedule_job`, `QRTZ_TRIGGERS` (快照查詢) |
+| `GET` | `/jobs/status` | `GetScheduleJobUseCase` | `schedule_job`, `QRTZ_TRIGGERS` (分頁與條件過濾快照查詢) |
 | `POST` | `/api/calendars` | `CreateCalendarUseCase` | `schedule_calendar`, `QRTZ_CALENDARS` |
 | `GET` | `/api/calendars` | `GetCalendarUseCase` | `schedule_calendar`, `schedule_calendar_excluded_dates` |
 | `GET` | `/api/calendars/{id}/holidays`| `GetCalendarUseCase` | `schedule_calendar_excluded_dates` |

@@ -25,6 +25,7 @@ import com.example.demo.application.shared.command.inbound.CreateCronJobCommand;
 import com.example.demo.application.shared.command.inbound.CreateOneTimeJobCommand;
 import com.example.demo.application.shared.command.inbound.UpdateScheduleCommand;
 import com.example.demo.application.shared.command.outbound.SyncJobToEngineCommand;
+import com.example.demo.application.shared.query.GetScheduleJobQuery;
 import com.example.demo.application.shared.exception.InvalidCronException;
 import com.example.demo.application.shared.exception.JobAlreadyExistsException;
 import com.example.demo.application.shared.exception.JobNotFoundException;
@@ -163,11 +164,11 @@ public class ScheduledJobApplicationService implements
     }
 
     /**
-     * <h2>查詢任務列表 (分頁)</h2>
+     * <h2>查詢任務列表 (分頁與條件過濾)</h2>
      */
     @Override
-    public PageGottenView<ScheduleJobGottenView> getJobInfoResources(int page, int size) {
-        PageGottenView<ScheduledJobModel> dbJobsPage = repository.findAll(page, size);
+    public PageGottenView<ScheduleJobGottenView> getJobInfoResources(GetScheduleJobQuery query) {
+        PageGottenView<ScheduledJobModel> dbJobsPage = repository.findAll(query);
         List<ScheduledJobModel> dbJobs = dbJobsPage.content();
 
         List<ScheduleJobGottenView> quartzJobs = getQuartzJobsSafe();

@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
+import java.util.List;
 import java.util.Optional;
 
 import org.junit.jupiter.api.DisplayName;
@@ -24,6 +25,9 @@ import com.example.demo.application.shared.command.outbound.SyncJobToEngineComma
 import com.example.demo.application.shared.exception.JobNotFoundException;
 import com.example.demo.application.shared.exception.ScheduleEngineException;
 import com.example.demo.application.shared.model.ScheduledJobModel;
+import com.example.demo.application.shared.query.GetScheduleJobQuery;
+import com.example.demo.application.shared.view.PageGottenView;
+import com.example.demo.application.shared.view.ScheduleJobGottenView;
 import com.example.demo.application.shared.vo.JobId;
 import com.example.demo.application.shared.vo.JobStatus;
 import com.example.demo.application.shared.vo.ScheduleRule;
@@ -149,5 +153,40 @@ class ScheduledJobApplicationServiceTest {
 			verify(jobScheduler, never()).pause(anyString(), anyString());
 		} catch (Exception e) {}
 		verify(repository, never()).save(any());
+	}
+
+	/**
+	 * Feature: 依條件查詢排程任務列表
+	 * Scenario: 當傳入 GetScheduleJobQuery 條件時，應協調 Repository 與 Quartz 引擎合成視圖
+	 * Given 資料庫與引擎中存在符合條件之排程任務
+	 * When 調用 getJobInfoResources(query)
+	 * Then 正確回傳分頁視圖且包含對應狀態
+	 */
+	@Test
+	@DisplayName("查詢任務列表：應依 GetScheduleJobQuery 條件撈取資料庫與 Quartz 狀態並組裝回傳")
+	void getJobInfoResources_ShouldReturnPageWithEngineStatus() throws Exception {
+		// Arrange
+		GetScheduleJobQuery query = new GetScheduleJobQuery(0, 10, JobStatus.NORMAL, "testJobBean", "TestGroup", ScheduleType.CRON);
+		ScheduledJobModel model = ScheduledJobModel.create("TestJob", "TestGroup", "testJobBean", ScheduleRule.cron("0 0 12 * * ?", true));
+		PageGottenView<ScheduledJobModel> dbPage = new PageGottenView<>(List.of(model), 0, 10, 1L, 1);
+		
+		when(repository.findAll(query)).thenReturn(dbPage);
+		ScheduleJobGottenView quartzJobView = ScheduleJobGottenView.builder()
+				.name("TestJob")
+				.group("TestGroup")
+				.state("NORMAL")
+				.triggerType("CRON")
+				.build();
+		when(jobScheduler.findAll()).thenReturn(List.of(quartzJobView));
+
+		// Act
+		PageGottenView<ScheduleJobGottenView> result = applicationService.getJobInfoResources(query);
+
+		// Assert
+		assertNotNull(result);
+		assertEquals(1, result.content().size());
+		assertEquals("TestJob", result.content().get(0).getName());
+		assertEquals("NORMAL", result.content().get(0).getState());
+		verify(repository, times(1)).findAll(query);
 	}
 }

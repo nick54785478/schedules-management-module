@@ -11,6 +11,7 @@ import com.example.demo.application.shared.command.inbound.BindJobCalendarComman
 import com.example.demo.application.shared.command.inbound.CreateCronJobCommand;
 import com.example.demo.application.shared.command.inbound.CreateOneTimeJobCommand;
 import com.example.demo.application.shared.command.inbound.UpdateScheduleCommand;
+import com.example.demo.application.shared.query.GetScheduleJobQuery;
 import com.example.demo.application.shared.view.PageGottenView;
 import com.example.demo.application.shared.view.ScheduleJobGottenView;
 import com.example.demo.iface.dto.req.BindJobCalendarResource;
@@ -25,6 +26,7 @@ import com.example.demo.iface.dto.res.ScheduleJobCreatedResource;
 import com.example.demo.iface.dto.res.ScheduleJobPausedResource;
 import com.example.demo.iface.dto.res.ScheduleJobResumedResource;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.AllArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -113,14 +115,37 @@ public class ScheduleJobController {
     }
 
     /**
-     * 查詢系統內所有排程狀態
+     * <h2>查詢與篩選排程任務狀態清單</h2>
+     * <p>
+     * 取得目前資料庫配置與 Quartz 引擎中的排程狀態快照。
+     * 支援多維度動態條件過濾（狀態、Job Type、群組、排程類型）與分頁機制。
+     * </p>
+     *
+     * @param page         頁碼 (0-based，預設為 0)
+     * @param size         每頁筆數 (預設為 10)
+     * @param status       排程狀態 (如: NORMAL, PAUSED, STOPPED, COMPLETED)
+     * @param jobType      Job Bean 名稱 (如: batchSendEmailJob)
+     * @param jobGroup     任務所屬群組 (與 group 參數互通)
+     * @param group        任務所屬群組 (別名)
+     * @param scheduleType 排程類型 (如: CRON, ONE_TIME)
+     * @return 分頁任務清單視圖與執行引擎狀態快照
      */
-    @Operation(summary = "查詢系統內所有排程狀態", description = "取得目前資料庫配置與 Quartz 引擎中的排程狀態快照")
+    @Operation(
+            summary = "查詢與篩選排程任務狀態清單",
+            description = "分頁查詢排程任務清單並取得 Quartz 即時狀態快照。可選配多維度條件過濾：status (任務狀態)、jobType (Bean 名稱)、jobGroup (所屬群組) 與 scheduleType (CRON 或 ONE_TIME)。若 Quartz 引擎離線，系統會自動降級標記為 UNKNOWN (ENGINE_OFFLINE) 並呈現資料庫靜態配置。"
+    )
     @GetMapping("/status")
     public ResponseEntity<PagedJobStatusSearchedResource> searchJobStatus(
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
-        PageGottenView<ScheduleJobGottenView> data = getScheduleJobUseCase.getJobInfoResources(page, size);
+            @Parameter(description = "頁碼 (0-based)") @RequestParam(defaultValue = "0") int page,
+            @Parameter(description = "每頁筆數") @RequestParam(defaultValue = "10") int size,
+            @Parameter(description = "排程狀態 (如: NORMAL, PAUSED, STOPPED, COMPLETED)") @RequestParam(required = false) String status,
+            @Parameter(description = "Job Bean 名稱 (技術標籤)") @RequestParam(required = false) String jobType,
+            @Parameter(description = "任務所屬群組") @RequestParam(required = false) String jobGroup,
+            @Parameter(description = "任務所屬群組 (別名)") @RequestParam(required = false) String group,
+            @Parameter(description = "排程類型 (如: CRON, ONE_TIME)") @RequestParam(required = false) String scheduleType) {
+        String effectiveGroup = (jobGroup != null && !jobGroup.isBlank()) ? jobGroup : group;
+        GetScheduleJobQuery query = GetScheduleJobQuery.of(page, size, status, jobType, effectiveGroup, scheduleType);
+        PageGottenView<ScheduleJobGottenView> data = getScheduleJobUseCase.getJobInfoResources(query);
         return new ResponseEntity<>(new PagedJobStatusSearchedResource("200",
                 "Success", data), HttpStatus.OK);
     }

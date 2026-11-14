@@ -1,14 +1,19 @@
 package com.example.demo.infra.adapter;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+import jakarta.persistence.criteria.Predicate;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Component;
 
 import com.example.demo.application.port.out.ScheduledJobRepositoryPort;
 import com.example.demo.application.shared.model.ScheduledJobModel;
+import com.example.demo.application.shared.query.GetScheduleJobQuery;
 import com.example.demo.application.shared.view.PageGottenView;
 import com.example.demo.application.shared.vo.JobId;
 import com.example.demo.application.shared.vo.ScheduleRule;
@@ -61,8 +66,30 @@ public class ScheduledJobRepositoryAdapter implements ScheduledJobRepositoryPort
     }
 
     @Override
-    public PageGottenView<ScheduledJobModel> findAll(int pageNumber, int pageSize) {
-        Page<ScheduledJobJpaEntity> page = jpaRepository.findAll(PageRequest.of(pageNumber, pageSize));
+    public PageGottenView<ScheduledJobModel> findAll(GetScheduleJobQuery query) {
+        int pageNumber = query != null ? Math.max(0, query.page()) : 0;
+        int pageSize = query != null && query.size() > 0 ? query.size() : 10;
+
+        Specification<ScheduledJobJpaEntity> spec = (root, q, cb) -> {
+            List<Predicate> predicates = new ArrayList<>();
+            if (query != null) {
+                if (query.status() != null) {
+                    predicates.add(cb.equal(root.get("status"), query.status()));
+                }
+                if (query.jobType() != null && !query.jobType().isBlank()) {
+                    predicates.add(cb.equal(root.get("jobType"), query.jobType().trim()));
+                }
+                if (query.jobGroup() != null && !query.jobGroup().isBlank()) {
+                    predicates.add(cb.equal(root.get("group"), query.jobGroup().trim()));
+                }
+                if (query.scheduleType() != null) {
+                    predicates.add(cb.equal(root.get("scheduleType"), query.scheduleType()));
+                }
+            }
+            return cb.and(predicates.toArray(new Predicate[0]));
+        };
+
+        Page<ScheduledJobJpaEntity> page = jpaRepository.findAll(spec, PageRequest.of(pageNumber, pageSize));
         return new PageGottenView<>(
                 page.getContent().stream().map(this::toModel).collect(Collectors.toList()),
                 page.getNumber(),

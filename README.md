@@ -158,7 +158,7 @@ public class BatchSendEmailJob implements Job {
 | `PUT` | `/jobs/{jobId}/bind-calendar` | `BindJobCalendarUseCase` | 為任務綁定或解除特定排除日曆黑名單 |
 | `POST` | `/jobs/pause/{jobId}` | `PauseScheduleJobUseCase` | 暫停指定排程任務 (原子操作同步引擎) |
 | `POST` | `/jobs/resume/{jobId}` | `ResumeScheduleJobUseCase` | 恢復已被暫停的排程任務 |
-| `GET` | `/jobs/status` | `GetScheduleJobUseCase` | 分頁查詢目前資料庫配置與引擎即時狀態快照 |
+| `GET` | `/jobs/status` | `GetScheduleJobUseCase` | 分頁與條件過濾查詢目前配置與即時狀態快照 (支援 status, jobType, jobGroup, scheduleType) |
 
 ### 2. 排程日曆黑名單管理 (`/api/calendars`)
 | HTTP Method | Path | 依賴之 Inbound Port | 描述 |

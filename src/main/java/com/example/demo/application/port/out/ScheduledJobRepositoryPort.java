@@ -3,6 +3,7 @@ package com.example.demo.application.port.out;
 import java.util.Optional;
 
 import com.example.demo.application.shared.model.ScheduledJobModel;
+import com.example.demo.application.shared.query.GetScheduleJobQuery;
 import com.example.demo.application.shared.view.PageGottenView;
 import com.example.demo.application.shared.vo.JobId;
 
@@ -24,5 +25,9 @@ public interface ScheduledJobRepositoryPort {
 
     Optional<ScheduledJobModel> findByNameAndGroup(String name, String group);
 
-    PageGottenView<ScheduledJobModel> findAll(int pageNumber, int pageSize);
+    PageGottenView<ScheduledJobModel> findAll(GetScheduleJobQuery query);
+
+    default PageGottenView<ScheduledJobModel> findAll(int pageNumber, int pageSize) {
+        return findAll(new GetScheduleJobQuery(pageNumber, pageSize, null, null, null, null));
+    }
 }
