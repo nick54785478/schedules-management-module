@@ -8,7 +8,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
-import com.example.demo.application.port.CronParserPort;
+import com.example.demo.application.port.out.CronParserPort;
 import com.example.demo.application.shared.exception.InvalidCronException;
 import com.example.demo.application.shared.exception.JobNotFoundException;
 import com.example.demo.application.shared.exception.JobAlreadyExistsException;

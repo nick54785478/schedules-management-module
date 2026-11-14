@@ -1,6 +1,12 @@
 package com.example.demo.iface.rest;
 
-import com.example.demo.application.service.ScheduledJobApplicationService;
+import com.example.demo.application.port.in.BindJobCalendarUseCase;
+import com.example.demo.application.port.in.CreateCronJobUseCase;
+import com.example.demo.application.port.in.CreateOneTimeJobUseCase;
+import com.example.demo.application.port.in.GetScheduleJobUseCase;
+import com.example.demo.application.port.in.PauseScheduleJobUseCase;
+import com.example.demo.application.port.in.ResumeScheduleJobUseCase;
+import com.example.demo.application.port.in.UpdateScheduleJobUseCase;
 import com.example.demo.application.shared.command.inbound.BindJobCalendarCommand;
 import com.example.demo.application.shared.command.inbound.CreateCronJobCommand;
 import com.example.demo.application.shared.command.inbound.CreateOneTimeJobCommand;
@@ -44,7 +50,13 @@ import java.time.format.DateTimeFormatter;
 @RequestMapping("/jobs")
 public class ScheduleJobController {
 
-    private ScheduledJobApplicationService applicationService;
+    private final CreateCronJobUseCase createCronJobUseCase;
+    private final CreateOneTimeJobUseCase createOneTimeJobUseCase;
+    private final BindJobCalendarUseCase bindJobCalendarUseCase;
+    private final PauseScheduleJobUseCase pauseScheduleJobUseCase;
+    private final ResumeScheduleJobUseCase resumeScheduleJobUseCase;
+    private final GetScheduleJobUseCase getScheduleJobUseCase;
+    private final UpdateScheduleJobUseCase updateScheduleJobUseCase;
 
     /**
      * 新增排程任務
@@ -53,7 +65,7 @@ public class ScheduleJobController {
     @PostMapping("/create-cron")
     public ResponseEntity<ScheduleJobCreatedResource> createCronJob(@Valid @RequestBody CreateCronJobResource request) {
         CreateCronJobCommand command = new CreateCronJobCommand(request.name(), request.group(), request.jobType(), request.cron(), request.calendarKey(), request.requestsRecovery());
-        applicationService.initializeCronTask(command);
+        createCronJobUseCase.initializeCronTask(command);
         return new ResponseEntity<>(new ScheduleJobCreatedResource("201", "定時排程任務建立成功"), HttpStatus.CREATED);
     }
 
@@ -65,7 +77,7 @@ public class ScheduleJobController {
         LocalDateTime executeDateTime = LocalDateTime.of(date, time);
 
         CreateOneTimeJobCommand command = new CreateOneTimeJobCommand(request.name(), request.group(), request.jobType(), executeDateTime, request.requestsRecovery());
-        applicationService.initializeOneTimeTask(command);
+        createOneTimeJobUseCase.initializeOneTimeTask(command);
         return new ResponseEntity<>(new ScheduleJobCreatedResource("201", "一次性排程任務建立成功"), HttpStatus.CREATED);
     }
 
@@ -76,7 +88,7 @@ public class ScheduleJobController {
     @PutMapping("/{jobId}/bind-calendar")
     public ResponseEntity<JobCalendarBoundResource> bindJobCalendar(@PathVariable("jobId") String jobId, @Valid @RequestBody BindJobCalendarResource request) {
         BindJobCalendarCommand command = new BindJobCalendarCommand(jobId, request.calendarKey());
-        applicationService.bindCalendar(command);
+        bindJobCalendarUseCase.bindCalendar(command);
         return ResponseEntity.ok(new JobCalendarBoundResource("200", "排程任務日曆綁定更新成功"));
     }
 
@@ -86,7 +98,7 @@ public class ScheduleJobController {
     @Operation(summary = "暫停特定的排程", description = "根據 JobId 暫停正在運行的排程任務")
     @PostMapping("/pause/{jobId}")
     public ResponseEntity<ScheduleJobPausedResource> pauseJob(@PathVariable("jobId") String jobId) {
-        applicationService.pauseTask(jobId);
+        pauseScheduleJobUseCase.pauseTask(jobId);
         return new ResponseEntity<>(new ScheduleJobPausedResource("200", "Job paused"), HttpStatus.OK);
     }
 
@@ -96,7 +108,7 @@ public class ScheduleJobController {
     @Operation(summary = "重啟特定的排程", description = "根據 JobId 恢復已被暫停的排程任務")
     @PostMapping("/resume/{jobId}")
     public ResponseEntity<ScheduleJobResumedResource> resumeJob(@PathVariable("jobId") String jobId) {
-        applicationService.resumeTask(jobId);
+        resumeScheduleJobUseCase.resumeTask(jobId);
         return new ResponseEntity<>(new ScheduleJobResumedResource("200", "Job resumed"), HttpStatus.OK);
     }
 
@@ -108,7 +120,7 @@ public class ScheduleJobController {
     public ResponseEntity<PagedJobStatusSearchedResource> searchJobStatus(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
-        PageGottenView<ScheduleJobGottenView> data = applicationService.getJobInfoResources(page, size);
+        PageGottenView<ScheduleJobGottenView> data = getScheduleJobUseCase.getJobInfoResources(page, size);
         return new ResponseEntity<>(new PagedJobStatusSearchedResource("200",
                 "Success", data), HttpStatus.OK);
     }
@@ -120,7 +132,7 @@ public class ScheduleJobController {
     @PutMapping("/{jobId}/update-cron")
     public ResponseEntity<JobCronUpdatedResource> updateCron(@PathVariable("jobId") String jobId, @Valid @RequestBody UpdateCronJobResource request) {
         UpdateScheduleCommand command = new UpdateScheduleCommand(jobId, "CRON", request.newCron(), null);
-        applicationService.updateJobSchedule(command);
+        updateScheduleJobUseCase.updateJobSchedule(command);
         return ResponseEntity.ok(new JobCronUpdatedResource("200", "更新 Cron 排程成功"));
     }
 
@@ -135,7 +147,7 @@ public class ScheduleJobController {
         LocalDateTime executeDateTime = LocalDateTime.of(date, time);
         
         UpdateScheduleCommand command = new UpdateScheduleCommand(jobId, "ONE_TIME", null, executeDateTime);
-        applicationService.updateJobSchedule(command);
+        updateScheduleJobUseCase.updateJobSchedule(command);
         return ResponseEntity.ok(new JobCronUpdatedResource("200", "更新單次排程成功"));
     }
 }

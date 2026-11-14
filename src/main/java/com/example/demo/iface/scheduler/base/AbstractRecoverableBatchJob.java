@@ -6,8 +6,8 @@ import org.quartz.JobExecutionContext;
 import org.quartz.JobExecutionException;
 import org.springframework.scheduling.quartz.QuartzJobBean;
 
-import com.example.demo.application.domain.checkpoint.aggregate.JobExecutionCheckpoint;
-import com.example.demo.application.domain.checkpoint.repository.JobExecutionCheckpointRepository;
+import com.example.demo.infra.persistence.checkpoint.entity.JobExecutionCheckpointJpaEntity;
+import com.example.demo.infra.persistence.checkpoint.repository.JobExecutionCheckpointJpaRepository;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -21,9 +21,9 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public abstract class AbstractRecoverableBatchJob extends QuartzJobBean {
 
-	private final JobExecutionCheckpointRepository checkpointRepository;
+	private final JobExecutionCheckpointJpaRepository checkpointRepository;
 
-	protected AbstractRecoverableBatchJob(JobExecutionCheckpointRepository checkpointRepository) {
+	protected AbstractRecoverableBatchJob(JobExecutionCheckpointJpaRepository checkpointRepository) {
 		this.checkpointRepository = checkpointRepository;
 	}
 
@@ -56,8 +56,8 @@ public abstract class AbstractRecoverableBatchJob extends QuartzJobBean {
 		String jobId = groupName + "." + jobName;
 
 		boolean isRecovering = context.isRecovering();
-		JobExecutionCheckpoint checkpoint;
-		Optional<JobExecutionCheckpoint> optionalCheckpoint = checkpointRepository.findByJobId(jobId);
+		JobExecutionCheckpointJpaEntity checkpoint;
+		Optional<JobExecutionCheckpointJpaEntity> optionalCheckpoint = checkpointRepository.findByJobId(jobId);
 
 		int currentStep = 0;
 		int totalSteps = 0;
@@ -77,7 +77,7 @@ public abstract class AbstractRecoverableBatchJob extends QuartzJobBean {
 				optionalCheckpoint.ifPresent(checkpointRepository::delete);
 				
 				totalSteps = calculateTotalSteps(context);
-				checkpoint = JobExecutionCheckpoint.initialize(jobId, totalSteps, isRecovering);
+				checkpoint = JobExecutionCheckpointJpaEntity.initialize(jobId, totalSteps, isRecovering);
 				checkpointRepository.saveAndFlush(checkpoint);
 			}
 
@@ -105,7 +105,7 @@ public abstract class AbstractRecoverableBatchJob extends QuartzJobBean {
 			log.error("【Batch 框架】❌ 任務 {} 發生例外異常", jobId, e);
 			if (optionalCheckpoint.isPresent() || !isRecovering) { 
 				// 確保 checkpoint 物件有被初始化再儲存狀態
-				JobExecutionCheckpoint failCheckpoint = checkpointRepository.findByJobId(jobId).orElse(null);
+				JobExecutionCheckpointJpaEntity failCheckpoint = checkpointRepository.findByJobId(jobId).orElse(null);
 				if (failCheckpoint != null) {
 					failCheckpoint.fail();
 					checkpointRepository.saveAndFlush(failCheckpoint);

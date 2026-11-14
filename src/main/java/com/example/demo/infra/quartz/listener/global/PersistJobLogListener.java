@@ -5,9 +5,9 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.example.demo.application.domain.joblog.aggregate.ScheduleJobLog;
 import com.example.demo.application.shared.listener.JobStatusListener;
-import com.example.demo.application.domain.joblog.repository.ScheduleJobLogRepository;
+import com.example.demo.infra.persistence.joblog.entity.ScheduleJobLogJpaEntity;
+import com.example.demo.infra.persistence.joblog.repository.ScheduleJobLogJpaRepository;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -28,7 +28,7 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 public class PersistJobLogListener implements JobStatusListener {
 
-	private final ScheduleJobLogRepository logRepository;
+	private final ScheduleJobLogJpaRepository logRepository;
 	
 	@Value("${app.schedule.job-log.enabled:false}")
 	private boolean isLogEnabled;
@@ -54,7 +54,7 @@ public class PersistJobLogListener implements JobStatusListener {
 		
 		startTime.remove();
 		try {
-			ScheduleJobLog logEntity = ScheduleJobLog.createVetoedLog(jobName, jobGroup, isRecovery);
+			ScheduleJobLogJpaEntity logEntity = ScheduleJobLogJpaEntity.createVetoedLog(jobName, jobGroup, isRecovery);
 			logRepository.save(logEntity);
 		} catch (Exception e) {
 			log.error("寫入任務中止日誌失敗", e);
@@ -71,15 +71,15 @@ public class PersistJobLogListener implements JobStatusListener {
 		startTime.remove();
 
 		try {
-			ScheduleJobLog logEntity;
+			ScheduleJobLogJpaEntity logEntity;
 			if (exception != null) {
 				String errorMsg = exception.getMessage();
 				if (errorMsg != null && errorMsg.length() > 500) {
 					errorMsg = errorMsg.substring(0, 500); // 截斷避免欄位溢位
 				}
-				logEntity = ScheduleJobLog.createFailedLog(jobName, jobGroup, duration, errorMsg, isRecovery);
+				logEntity = ScheduleJobLogJpaEntity.createFailedLog(jobName, jobGroup, duration, errorMsg, isRecovery);
 			} else {
-				logEntity = ScheduleJobLog.createSuccessLog(jobName, jobGroup, duration, isRecovery);
+				logEntity = ScheduleJobLogJpaEntity.createSuccessLog(jobName, jobGroup, duration, isRecovery);
 			}
 			logRepository.save(logEntity);
 		} catch (Exception e) {

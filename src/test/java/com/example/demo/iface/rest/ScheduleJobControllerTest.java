@@ -17,7 +17,13 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-import com.example.demo.application.service.ScheduledJobApplicationService;
+import com.example.demo.application.port.in.BindJobCalendarUseCase;
+import com.example.demo.application.port.in.CreateCronJobUseCase;
+import com.example.demo.application.port.in.CreateOneTimeJobUseCase;
+import com.example.demo.application.port.in.GetScheduleJobUseCase;
+import com.example.demo.application.port.in.PauseScheduleJobUseCase;
+import com.example.demo.application.port.in.ResumeScheduleJobUseCase;
+import com.example.demo.application.port.in.UpdateScheduleJobUseCase;
 import com.example.demo.application.shared.command.inbound.BindJobCalendarCommand;
 import com.example.demo.application.shared.command.inbound.CreateCronJobCommand;
 import com.example.demo.application.shared.command.inbound.CreateOneTimeJobCommand;
@@ -32,7 +38,25 @@ class ScheduleJobControllerTest {
     private MockMvc mockMvc;
 
     @MockitoBean
-    private ScheduledJobApplicationService applicationService;
+    private CreateCronJobUseCase createCronJobUseCase;
+
+    @MockitoBean
+    private CreateOneTimeJobUseCase createOneTimeJobUseCase;
+
+    @MockitoBean
+    private BindJobCalendarUseCase bindJobCalendarUseCase;
+
+    @MockitoBean
+    private PauseScheduleJobUseCase pauseScheduleJobUseCase;
+
+    @MockitoBean
+    private ResumeScheduleJobUseCase resumeScheduleJobUseCase;
+
+    @MockitoBean
+    private GetScheduleJobUseCase getScheduleJobUseCase;
+
+    @MockitoBean
+    private UpdateScheduleJobUseCase updateScheduleJobUseCase;
 
     @Test
     @DisplayName("POST /jobs/create-cron - 應成功建立 Cron 排程並回傳 201")
@@ -54,7 +78,7 @@ class ScheduleJobControllerTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.message").value("定時排程任務建立成功"));
 
-        verify(applicationService, times(1)).initializeCronTask(any(CreateCronJobCommand.class));
+        verify(createCronJobUseCase, times(1)).initializeCronTask(any(CreateCronJobCommand.class));
     }
 
     @Test
@@ -77,7 +101,7 @@ class ScheduleJobControllerTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.message").value("一次性排程任務建立成功"));
 
-        verify(applicationService, times(1)).initializeOneTimeTask(any(CreateOneTimeJobCommand.class));
+        verify(createOneTimeJobUseCase, times(1)).initializeOneTimeTask(any(CreateOneTimeJobCommand.class));
     }
 
     @Test
@@ -95,7 +119,7 @@ class ScheduleJobControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.message").value("排程任務日曆綁定更新成功"));
 
-        verify(applicationService, times(1)).bindCalendar(any(BindJobCalendarCommand.class));
+        verify(bindJobCalendarUseCase, times(1)).bindCalendar(any(BindJobCalendarCommand.class));
     }
 
     @Test
@@ -107,7 +131,7 @@ class ScheduleJobControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.message").value("Job paused"));
 
-        verify(applicationService, times(1)).pauseTask("TestGroup.TestJob");
+        verify(pauseScheduleJobUseCase, times(1)).pauseTask("TestGroup.TestJob");
     }
 
     @Test
@@ -119,7 +143,7 @@ class ScheduleJobControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.message").value("Job resumed"));
 
-        verify(applicationService, times(1)).resumeTask("TestGroup.TestJob");
+        verify(resumeScheduleJobUseCase, times(1)).resumeTask("TestGroup.TestJob");
     }
 
     @Test
@@ -137,7 +161,7 @@ class ScheduleJobControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.message").value("更新 Cron 排程成功"));
 
-        verify(applicationService, times(1)).updateJobSchedule(any(UpdateScheduleCommand.class));
+        verify(updateScheduleJobUseCase, times(1)).updateJobSchedule(any(UpdateScheduleCommand.class));
     }
 
     @Test
@@ -156,7 +180,7 @@ class ScheduleJobControllerTest {
                 0, 10, 1L, 1
         );
 
-        when(applicationService.getJobInfoResources(0, 10)).thenReturn(mockPage);
+        when(getScheduleJobUseCase.getJobInfoResources(0, 10)).thenReturn(mockPage);
 
         mockMvc.perform(get("/jobs/status")
                 .param("page", "0")
@@ -166,6 +190,6 @@ class ScheduleJobControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.content[0].name").value("TestJob"));
 
-        verify(applicationService, times(1)).getJobInfoResources(0, 10);
+        verify(getScheduleJobUseCase, times(1)).getJobInfoResources(0, 10);
     }
 }

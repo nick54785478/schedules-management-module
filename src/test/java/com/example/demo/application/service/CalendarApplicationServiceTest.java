@@ -17,19 +17,19 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import com.example.demo.application.domain.calendar.aggregate.ScheduleCalendar;
-import com.example.demo.application.port.JobSchedulerPort;
-import com.example.demo.application.shared.command.outbound.SyncCalendarToEngineCommand;
+import com.example.demo.application.port.out.JobSchedulerPort;
+import com.example.demo.application.port.out.ScheduleCalendarRepositoryPort;
 import com.example.demo.application.shared.command.inbound.AddExcludedDateCommand;
 import com.example.demo.application.shared.command.inbound.CreateCalendarCommand;
-import com.example.demo.application.domain.calendar.repository.ScheduleCalendarRepository;
+import com.example.demo.application.shared.command.outbound.SyncCalendarToEngineCommand;
+import com.example.demo.application.shared.model.ScheduleCalendarModel;
 import org.quartz.SchedulerException;
 
 @ExtendWith(MockitoExtension.class)
 class CalendarApplicationServiceTest {
 
     @Mock
-    private ScheduleCalendarRepository repository;
+    private ScheduleCalendarRepositoryPort repository;
 
     @Mock
     private JobSchedulerPort jobScheduler;
@@ -37,13 +37,13 @@ class CalendarApplicationServiceTest {
     @InjectMocks
     private CalendarApplicationService applicationService;
 
-    private ScheduleCalendar testCalendar;
+    private ScheduleCalendarModel testCalendar;
     private UUID testId;
 
     @BeforeEach
     void setUp() {
         testId = UUID.randomUUID();
-        testCalendar = ScheduleCalendar.create("TAIWAN_HOLIDAY", "測試用假期");
+        testCalendar = ScheduleCalendarModel.create("TAIWAN_HOLIDAY", "測試用假期");
     }
 
     @Test
@@ -57,13 +57,13 @@ class CalendarApplicationServiceTest {
         applicationService.createCalendar(command);
 
         // Assert
-        ArgumentCaptor<ScheduleCalendar> calendarCaptor = ArgumentCaptor.forClass(ScheduleCalendar.class);
+        ArgumentCaptor<ScheduleCalendarModel> calendarCaptor = ArgumentCaptor.forClass(ScheduleCalendarModel.class);
         verify(repository, times(1)).save(calendarCaptor.capture());
         verify(jobScheduler, times(1)).syncCalendar(any(SyncCalendarToEngineCommand.class));
 
-        ScheduleCalendar savedCalendar = calendarCaptor.getValue();
-        assertEquals("NEW_HOLIDAY", savedCalendar.getKey());
-        assertEquals("新的假期日曆", savedCalendar.getDescription());
+        ScheduleCalendarModel savedCalendar = calendarCaptor.getValue();
+        assertEquals("NEW_HOLIDAY", savedCalendar.key());
+        assertEquals("新的假期日曆", savedCalendar.description());
     }
 
     @Test
@@ -84,7 +84,7 @@ class CalendarApplicationServiceTest {
     }
 
     @Test
-    @DisplayName("新增排除日期：應正確加入領域模型並同步至 Quartz")
+    @DisplayName("新增排除日期：應正確加入模型並同步至 Quartz")
     void addExcludedDate_ShouldUpdateAndSync_WhenCalendarExists() throws Exception {
         // Arrange
         LocalDate targetDate = LocalDate.of(2026, 10, 10);
@@ -95,32 +95,32 @@ class CalendarApplicationServiceTest {
         applicationService.addExcludedDate(command);
 
         // Assert
-        ArgumentCaptor<ScheduleCalendar> calendarCaptor = ArgumentCaptor.forClass(ScheduleCalendar.class);
+        ArgumentCaptor<ScheduleCalendarModel> calendarCaptor = ArgumentCaptor.forClass(ScheduleCalendarModel.class);
         verify(repository, times(1)).save(calendarCaptor.capture());
         verify(jobScheduler, times(1)).syncCalendar(any(SyncCalendarToEngineCommand.class));
 
-        ScheduleCalendar updatedCalendar = calendarCaptor.getValue();
-        assertTrue(updatedCalendar.getExcludedDates().contains(targetDate));
+        ScheduleCalendarModel updatedCalendar = calendarCaptor.getValue();
+        assertTrue(updatedCalendar.excludedDates().contains(targetDate));
     }
 
     @Test
-    @DisplayName("移除排除日期：應正確從領域模型拔除並同步至 Quartz")
+    @DisplayName("移除排除日期：應正確從模型拔除並同步至 Quartz")
     void removeExcludedDate_ShouldUpdateAndSync_WhenCalendarExists() throws Exception {
         // Arrange
         LocalDate targetDate = LocalDate.of(2026, 1, 1);
-        testCalendar.addExcludedDate(targetDate); // 先預塞一天
+        testCalendar = testCalendar.addExcludedDate(targetDate); // 先預塞一天
         when(repository.findById(testId)).thenReturn(Optional.of(testCalendar));
 
         // Act
         applicationService.removeExcludedDate(testId, targetDate);
 
         // Assert
-        ArgumentCaptor<ScheduleCalendar> calendarCaptor = ArgumentCaptor.forClass(ScheduleCalendar.class);
+        ArgumentCaptor<ScheduleCalendarModel> calendarCaptor = ArgumentCaptor.forClass(ScheduleCalendarModel.class);
         verify(repository, times(1)).save(calendarCaptor.capture());
         verify(jobScheduler, times(1)).syncCalendar(any(SyncCalendarToEngineCommand.class));
 
-        ScheduleCalendar updatedCalendar = calendarCaptor.getValue();
-        assertFalse(updatedCalendar.getExcludedDates().contains(targetDate));
+        ScheduleCalendarModel updatedCalendar = calendarCaptor.getValue();
+        assertFalse(updatedCalendar.excludedDates().contains(targetDate));
     }
 
     @Test
@@ -140,4 +140,3 @@ class CalendarApplicationServiceTest {
         verify(jobScheduler, never()).syncCalendar(any());
     }
 }
-

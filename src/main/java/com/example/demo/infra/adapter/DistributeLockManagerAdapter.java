@@ -1,7 +1,7 @@
 package com.example.demo.infra.adapter;
 
-import com.example.demo.application.port.DistributeLockManagerPort;
-import com.example.demo.application.domain.distlock.repository.DistributedLockRepository;
+import com.example.demo.application.port.out.DistributeLockManagerPort;
+import com.example.demo.infra.persistence.distlock.repository.DistributedLockJpaRepository;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -16,7 +16,7 @@ import java.time.Instant;
 @AllArgsConstructor
 class DistributeLockManagerAdapter implements DistributeLockManagerPort {
 
-    private DistributedLockRepository distributedLockRepository;
+    private DistributedLockJpaRepository distributedLockRepository;
 
     /**
      * 取得分布式锁

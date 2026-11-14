@@ -6,8 +6,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-import com.example.demo.application.domain.schedule.aggregate.vo.CronExpression;
 import com.example.demo.application.shared.exception.InvalidCronException;
+import com.example.demo.application.shared.vo.CronExpression;
 
 class CronParserAdapterTest {
 

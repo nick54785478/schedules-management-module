@@ -2,12 +2,11 @@ package com.example.demo.infra.quartz.listener.global;
 
 import org.springframework.stereotype.Component;
 
+import com.example.demo.application.port.in.CompleteScheduleJobUseCase;
 import com.example.demo.application.shared.listener.JobStatusListener;
 
-import lombok.extern.slf4j.Slf4j;
-
 import lombok.RequiredArgsConstructor;
-import com.example.demo.application.service.ScheduledJobApplicationService;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * <h2>全域排程任務監控監聽器</h2>
@@ -27,7 +26,7 @@ import com.example.demo.application.service.ScheduledJobApplicationService;
 @RequiredArgsConstructor
 public class GlobalJobListener implements JobStatusListener {
 
-	private final ScheduledJobApplicationService applicationService;
+	private final CompleteScheduleJobUseCase completeScheduleJobUseCase;
 
 	// 用於追蹤起始時間的線程安全容器，確保 Quartz 多執行緒併發執行時不會互相污染變數
 	private final ThreadLocal<Long> startTime = new ThreadLocal<>();
@@ -80,7 +79,7 @@ public class GlobalJobListener implements JobStatusListener {
 		} else {
 			log.info("[排程監控] <<< 任務執行成功: {}.{} (Recovery: {}), 總耗時: {}ms", jobGroup, jobName, isRecovery, duration);
 			// 執行成功後，若是 ONE_TIME 任務則變更資料庫狀態
-			applicationService.completeOneTimeJob(jobName, jobGroup);
+			completeScheduleJobUseCase.completeOneTimeJob(jobName, jobGroup);
 		}
 
 		startTime.remove(); // 執行結束，務必清理 ThreadLocal 避免 Memory Leak

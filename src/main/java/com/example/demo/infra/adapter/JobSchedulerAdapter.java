@@ -1,7 +1,7 @@
 package com.example.demo.infra.adapter;
 
 import com.example.demo.application.shared.command.outbound.SyncCalendarToEngineCommand;
-import com.example.demo.application.port.JobSchedulerPort;
+import com.example.demo.application.port.out.JobSchedulerPort;
 import com.example.demo.application.shared.command.outbound.SyncJobToEngineCommand;
 import com.example.demo.application.shared.exception.CalendarSyncException;
 import com.example.demo.application.shared.exception.ScheduleEngineException;

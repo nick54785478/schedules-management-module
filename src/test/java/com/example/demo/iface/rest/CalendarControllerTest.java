@@ -20,8 +20,10 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
-import com.example.demo.application.domain.calendar.aggregate.ScheduleCalendar;
-import com.example.demo.application.service.CalendarApplicationService;
+import com.example.demo.application.port.in.AddExcludedDateUseCase;
+import com.example.demo.application.port.in.CreateCalendarUseCase;
+import com.example.demo.application.port.in.GetCalendarUseCase;
+import com.example.demo.application.port.in.RemoveExcludedDateUseCase;
 import com.example.demo.application.shared.command.inbound.AddExcludedDateCommand;
 import com.example.demo.application.shared.command.inbound.CreateCalendarCommand;
 import com.example.demo.application.shared.view.ScheduleCalendarView;
@@ -33,7 +35,16 @@ class CalendarControllerTest {
     private MockMvc mockMvc;
 
     @MockitoBean
-    private CalendarApplicationService applicationService;
+    private CreateCalendarUseCase createCalendarUseCase;
+
+    @MockitoBean
+    private GetCalendarUseCase getCalendarUseCase;
+
+    @MockitoBean
+    private AddExcludedDateUseCase addExcludedDateUseCase;
+
+    @MockitoBean
+    private RemoveExcludedDateUseCase removeExcludedDateUseCase;
 
     @Test
     @DisplayName("POST /api/calendars - 應成功建立日曆並回傳 201")
@@ -53,7 +64,7 @@ class CalendarControllerTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.message").value("日曆建立成功"));
 
-        verify(applicationService, times(1)).createCalendar(any(CreateCalendarCommand.class));
+        verify(createCalendarUseCase, times(1)).createCalendar(any(CreateCalendarCommand.class));
     }
 
     @Test
@@ -64,7 +75,7 @@ class CalendarControllerTest {
                 0, 10, 1L, 1
         );
 
-        when(applicationService.findAllCalendars(0, 10)).thenReturn(mockPage);
+        when(getCalendarUseCase.findAllCalendars(0, 10)).thenReturn(mockPage);
 
         mockMvc.perform(get("/api/calendars")
                 .param("page", "0")
@@ -74,7 +85,7 @@ class CalendarControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[0].key").value("TAIWAN_HOLIDAY"));
 
-        verify(applicationService, times(1)).findAllCalendars(0, 10);
+        verify(getCalendarUseCase, times(1)).findAllCalendars(0, 10);
     }
 
     @Test
@@ -87,7 +98,7 @@ class CalendarControllerTest {
                 LocalDate.of(2026, 2, 28)
         )));
 
-        when(applicationService.findCalendarById(id)).thenReturn(Optional.of(mockCalendarView));
+        when(getCalendarUseCase.findCalendarById(id)).thenReturn(Optional.of(mockCalendarView));
 
         // Act & Assert
         mockMvc.perform(get("/api/calendars/" + id + "/holidays")
@@ -117,7 +128,7 @@ class CalendarControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.message").value("假日新增成功"));
 
-        verify(applicationService, times(1)).addExcludedDate(any(AddExcludedDateCommand.class));
+        verify(addExcludedDateUseCase, times(1)).addExcludedDate(any(AddExcludedDateCommand.class));
     }
 
     @Test
@@ -131,7 +142,7 @@ class CalendarControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.message").value("假日移除成功"));
 
-        verify(applicationService, times(1)).removeExcludedDate(eq(id), eq(LocalDate.of(2026, 10, 10)));
+        verify(removeExcludedDateUseCase, times(1)).removeExcludedDate(eq(id), eq(LocalDate.of(2026, 10, 10)));
     }
 }
 

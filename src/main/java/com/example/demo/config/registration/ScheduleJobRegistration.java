@@ -1,7 +1,7 @@
 package com.example.demo.config.registration;
 
-import com.example.demo.application.port.JobSchedulerPort;
-import com.example.demo.application.service.ScheduledJobApplicationService;
+import com.example.demo.application.port.in.CreateCronJobUseCase;
+import com.example.demo.application.port.out.JobSchedulerPort;
 import com.example.demo.application.shared.command.inbound.CreateCronJobCommand;
 import com.example.demo.infra.quartz.listener.global.GlobalJobListener;
 import com.example.demo.infra.quartz.listener.global.PersistJobLogListener;
@@ -39,7 +39,7 @@ public class ScheduleJobRegistration {
     private final GlobalJobListener globalJobListener; // 假設這是一個全域 Log 監聽器
     private final MessagePrintJobListener messagePrintJobListener;
     private final PersistJobLogListener persistJobLogListener; // 持久化日誌監聽器
-    private final ScheduledJobApplicationService applicationService;
+    private final CreateCronJobUseCase createCronJobUseCase;
 
     /**
      * <h2>系統初始化啟動點</h2>
@@ -89,7 +89,7 @@ public class ScheduleJobRegistration {
      */
     private void registerSystemJob(String jobName, String groupName, String cronExpression, String jobClass) {
         CreateCronJobCommand command = new CreateCronJobCommand(jobName, groupName, jobClass, cronExpression, null, true);
-        applicationService.initializeCronTask(command);
+        createCronJobUseCase.initializeCronTask(command);
     }
 
 }

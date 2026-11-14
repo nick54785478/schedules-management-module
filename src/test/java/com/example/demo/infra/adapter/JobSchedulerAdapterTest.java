@@ -22,8 +22,8 @@ import org.quartz.Scheduler;
 import org.quartz.Trigger;
 import org.springframework.context.ApplicationContext;
 
-import com.example.demo.application.domain.schedule.aggregate.vo.ScheduleRule;
 import com.example.demo.application.shared.command.outbound.SyncJobToEngineCommand;
+import com.example.demo.application.shared.vo.ScheduleRule;
 
 @ExtendWith(MockitoExtension.class)
 class JobSchedulerAdapterTest {

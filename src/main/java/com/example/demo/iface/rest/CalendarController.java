@@ -1,9 +1,13 @@
 package com.example.demo.iface.rest;
 
-import com.example.demo.application.service.CalendarApplicationService;
+import com.example.demo.application.port.in.AddExcludedDateUseCase;
+import com.example.demo.application.port.in.CreateCalendarUseCase;
+import com.example.demo.application.port.in.GetCalendarUseCase;
+import com.example.demo.application.port.in.RemoveExcludedDateUseCase;
 import com.example.demo.application.shared.command.inbound.AddExcludedDateCommand;
 import com.example.demo.application.shared.command.inbound.CreateCalendarCommand;
 import com.example.demo.application.shared.view.PageGottenView;
+import com.example.demo.application.shared.view.ScheduleCalendarView;
 import com.example.demo.iface.dto.req.AddExcludedDateResource;
 import com.example.demo.iface.dto.req.CreateCalendarResource;
 import com.example.demo.iface.dto.res.CalendarCreatedResource;
@@ -35,13 +39,16 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class CalendarController {
 
-    private final CalendarApplicationService applicationService;
+    private final CreateCalendarUseCase createCalendarUseCase;
+    private final GetCalendarUseCase getCalendarUseCase;
+    private final AddExcludedDateUseCase addExcludedDateUseCase;
+    private final RemoveExcludedDateUseCase removeExcludedDateUseCase;
 
     @Operation(summary = "建立新日曆", description = "建立一個全新的全域日曆黑名單")
     @PostMapping
     public ResponseEntity<CalendarCreatedResource> createCalendar(@Valid @RequestBody CreateCalendarResource request) {
         CreateCalendarCommand command = new CreateCalendarCommand(request.key(), request.description());
-        applicationService.createCalendar(command);
+        createCalendarUseCase.createCalendar(command);
         return new ResponseEntity<>(new CalendarCreatedResource("201", "日曆建立成功"), HttpStatus.CREATED);
     }
 
@@ -50,14 +57,14 @@ public class CalendarController {
     public ResponseEntity<PageGottenView<com.example.demo.application.shared.view.ScheduleCalendarView>> getAllCalendars(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
-        PageGottenView<com.example.demo.application.shared.view.ScheduleCalendarView> result = applicationService.findAllCalendars(page, size);
+        PageGottenView<ScheduleCalendarView> result = getCalendarUseCase.findAllCalendars(page, size);
         return ResponseEntity.ok(result);
     }
 
     @Operation(summary = "查詢單一日曆的所有排除日期", description = "根據日曆 ID 查詢其下所有設定的排除日期")
     @GetMapping("/{id}/holidays")
     public ResponseEntity<List<LocalDate>> getCalendarHolidays(@PathVariable("id") UUID id) {
-        List<LocalDate> dates = applicationService.findCalendarById(id)
+        List<LocalDate> dates = getCalendarUseCase.findCalendarById(id)
                 .map(cal -> new ArrayList<>(cal.excludedDates()))
                 .orElseThrow(() -> new IllegalArgumentException("找不到該日曆 ID: " + id));
         return ResponseEntity.ok(dates);
@@ -67,14 +74,14 @@ public class CalendarController {
     @PostMapping("/{id}/holidays")
     public ResponseEntity<HolidayAddedResource> addHoliday(@PathVariable("id") UUID id, @Valid @RequestBody AddExcludedDateResource request) {
         AddExcludedDateCommand command = new AddExcludedDateCommand(id, request.date());
-        applicationService.addExcludedDate(command);
+        addExcludedDateUseCase.addExcludedDate(command);
         return ResponseEntity.ok(new HolidayAddedResource("200", "假日新增成功"));
     }
 
     @Operation(summary = "刪除排除日期", description = "將特定日期從黑名單中移除 (例如: 補班日)")
     @DeleteMapping("/{id}/holidays/{date}")
     public ResponseEntity<HolidayRemovedResource> removeHoliday(@PathVariable("id") UUID id, @PathVariable("date") LocalDate date) {
-        applicationService.removeExcludedDate(id, date);
+        removeExcludedDateUseCase.removeExcludedDate(id, date);
         return ResponseEntity.ok(new HolidayRemovedResource("200", "假日移除成功"));
     }
 }

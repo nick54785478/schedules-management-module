@@ -1,130 +1,192 @@
-# 分散式排程任務管理模組
+# 分散式排程任務管理模組 (Schedules Management Module)
 
-本模組基於 Spring Boot 4.0.6 與 Quartz Scheduler 構建，旨在提供一個高可用、強一致性且具備領域驅動設計（DDD）特性的排程管理系統。
+本模組基於 **Spring Boot 4.0.6** 與 **Quartz Scheduler 2.5.2** 構建，定位為**嵌入式技術基礎設施模組 (Embedded Technical Infrastructure Module)**。它旨在為未來的各項微服務提供一套高可用、具備事務強一致性且遵循 **Clean Architecture（六角架構 / Ports and Adapters）** 的排程調度核心基底。
 
-## 核心架構設計
+---
 
-本模組採用 六角架構（Ports and Adapters），確保業務邏輯與技術實現（Quartz）完全解耦：
+## 一、 架構設計原則 (Clean Architecture & Hexagonal Architecture)
 
-**Domain Layer**: 
-> 包含 ScheduledJob 聚合根與 CronExpression 值物件。
+本模組嚴格遵循依賴反轉與關注點分離原則，各層之間透過純資料模型、Command/Query 與 Port 介面進行通訊：
 
-**Application Layer**:
->* ScheduledJobApplicationService 負責協調資料庫持久化與 Quartz 引擎狀態。
->* 透過 CronParserPort 確保進入領域層的數據絕對合法。
+```
++-----------------------------------------------------------------------------------+
+|                        Presentation Layer (Inbound Adapters)                      |
+|  - REST Controllers: ScheduleJobController, CalendarController                    |
+|  - Quartz Inbound Jobs: BatchSendEmailJob, FailoverSimulationJob, etc.            |
++------------------------------------------+----------------------------------------+
+                                           | calls UseCases (Inbound Ports)
+                                           v
++-----------------------------------------------------------------------------------+
+|                                 Application Layer                                 |
+|  [port/in/] Inbound Ports (V + N + UseCase)                                       |
+|    - CreateCronJobUseCase, CreateOneTimeJobUseCase, UpdateScheduleJobUseCase      |
+|    - BindJobCalendarUseCase, PauseScheduleJobUseCase, ResumeScheduleJobUseCase    |
+|    - CompleteScheduleJobUseCase, GetScheduleJobUseCase                            |
+|    - CreateCalendarUseCase, AddExcludedDateUseCase                                |
+|    - RemoveExcludedDateUseCase, GetCalendarUseCase                                |
+|                                                                                   |
+|  [service/] Application Services                                                  |
+|    - ScheduledJobApplicationService, CalendarApplicationService                   |
+|                                                                                   |
+|  [shared/] Pure Data Contracts (零外部技術侵入)                                   |
+|    - vo/: JobId, JobStatus, ScheduleType, CronExpression, ScheduleRule           |
+|    - model/: ScheduledJobModel, ScheduleCalendarModel                             |
+|    - command/: Inbound / Outbound Commands                                        |
+|    - view/: ScheduleJobGottenView, ScheduleCalendarView, PageGottenView          |
+|    - exception/: JobNotFoundException, CalendarNotFoundException, etc.            |
+|                                                                                   |
+|  [port/out/] Outbound Ports (...Port)                                             |
+|    - ScheduledJobRepositoryPort, ScheduleCalendarRepositoryPort                   |
+|    - JobSchedulerPort, CronParserPort, DistributeLockManagerPort                  |
++------------------------------------------+----------------------------------------+
+                                           ^ implemented by Adapters
+                                           |
++-----------------------------------------------------------------------------------+
+|                      Infrastructure Layer (Outbound Adapters)                     |
+|  [adapter/]                                                                       |
+|    - ScheduledJobRepositoryAdapter, ScheduleCalendarRepositoryAdapter             |
+|    - JobSchedulerAdapter, CronParserAdapter, DistributeLockManagerAdapter         |
+|                                                                                   |
+|  [persistence/] (JPA Entities & Spring Data Repositories)                         |
+|    - schedule/: ScheduledJobJpaEntity, ScheduledJobJpaRepository                  |
+|    - calendar/: ScheduleCalendarJpaEntity, ScheduleCalendarJpaRepository          |
+|    - joblog/, distlock/, checkpoint/                                              |
+|                                                                                   |
+|  [quartz/]                                                                        |
+|    - Configuration, AutowiringSpringBeanJobFactory, Listeners                     |
++-----------------------------------------------------------------------------------+
+```
 
-**Infrastructure Layer**:
->* QuartzAdapter: 實現 JobSchedulerPort，負責具體的 Quartz 操作。
->* QuartzCronParser: 實現 CronParserPort，利用 Quartz 內建邏輯進行語法檢核。
+### 1. Inbound Ports (`application/port/in/`)
+- **命名風格**：嚴格遵循 **`V + N + UseCase` (動詞 + 名詞 + UseCase)** 命名規範。
+- **介面隔離原則 (ISP)**：拒絕龐大的 CRUD Fat Interface，依業務目標拆分為高內聚的細粒度用例合約，使表現層控制器與監聽器僅依賴其真正需要的業務方法。
+- **傳參規範**：所有方法皆接收純 Command/Query 或純基本型別，並回傳純資料視圖 (View/DTO)，嚴禁傳入任何技術實體。
 
-## 關鍵技術特性
+### 2. Outbound Ports (`application/port/out/`)
+- 應用層對基礎設施層提出的契約，一律以 **`...Port`** 結尾。
+- 隔離所有底層細節（如 JPA 資料庫、分散式鎖、Quartz 排程引擎、Cron 表達式解析器）。
 
-**1. 分散式叢集與高可用 (HA)**
-透過資料庫鎖機制實現多節點協作，防止任務重複執行並支援故障轉移（Failover）。
->* 動態識別：各節點啟動時自動生成 instanceId。
->* 心跳監測：每 15 秒向 QRTZ_SCHEDULER_STATE 表更新狀態。
+### 3. Application Services (`application/service/`)
+- 作為 Inbound Port UseCases 的實作者，協調整合 Outbound Ports（資料持久化與 Quartz 引擎調度），管理 `@Transactional` 事務邊界。
 
-**2. 事務強一致性 (Transactional Integrity)**
-本模組採用 共享資料源 (Shared DataSource) 策略：
->* 原子操作：業務資料表（自定義 Job 表）與 Quartz 系統表（QRTZ_）共用同一個 JDBC 連線。
->* 同步回滾：當更新排程（如 pauseTask 或 updateCron）時，若任一環節失敗，兩邊的資料將同步回滾，防止狀態偏差。
+### 4. Infrastructure Layer (`infra/`)
+- **持久化分離 (`infra/persistence/`)**：資料庫 ORM 實體 (`@Entity`) 與 Spring Data Repositories 完全收攏於此層，不向外層滲透。
+- **適配器出口 (`infra/adapter/`)**：實作 Outbound Port 介面，一律以 **`...Adapter`** 結尾，負責 JPA Entity 與純資料模型 (`ScheduledJobModel`, `ScheduleCalendarModel`) 之間的防腐轉換。
 
-**3. 領域保護機制 (The Gatekeeper)**
-> 採用 純粹派 DDD 設計，透過 CronParserPort 攔截無效的 Cron 表達式，確保 ScheduledJob 聚合根在記憶體中始終處於合法狀態。
+---
 
-**4. 務實的領域驅動設計 (Pragmatic DDD)**
-本專案在架構上採用了「務實的 DDD (Pragmatic DDD)」取捨，在保持核心領域模型嚴謹的同時，也兼顧了微服務開發的開發效率：
->* **允許框架侵入 (JPA & Lombok)**：允許 JPA Annotation (`@Entity`, `@Table`) 與 Lombok 註解直接標記在領域模型 (Domain Model) 上。這省去了大量的 Mapper 與 Entity <-> Domain 轉換工本，大幅提升中小型專案的開發效率。
->* **以功能切片 (Package by Feature)**：Domain Layer 內部依照功能切分子領域（如 `schedule`, `calendar`, `joblog`），將對應的 Aggregate Root 與 VO 收攏在一起，保持極高的模組內聚性。
->* **領域防腐與封裝 (Encapsulation)**：即便引入了 Lombok，依然嚴格透過覆寫 Getter 回傳 `Collections.unmodifiableSet()` 來防止底層 Collection 被外部意外竄改；並且封閉 Setter，要求所有業務狀態的變更都必須透過具備防禦性設計的領域方法（如 `changeSchedule`）進行，拒絕退化為貧血模型 (Anemic Domain Model)。
+## 二、 核心技術特性
 
-**5. 微服務引入指南 (Microservice Integration Guide)**
-本模組在內部雖然具備完整的 DDD 架構，但**當其他微服務引入此模組時，請將本模組的所有內容 (包含其 Domain 層) 視為該微服務的 Infrastructure (基礎設施層)**。
-> 對於您的微服務而言，排程管理僅是一種「技術支援」或「外部系統」。因此：
-> * **避免業務污染**：微服務的核心業務邏輯 (Domain Layer) 中，絕不該出現對 `ScheduledJob` 等本模組實體的直接依賴。
-> * **依賴反轉**：您的業務領域應該定義自己的 Port (介面)，並在微服務的 Infrastructure 層實作該 Port，於其中呼叫本模組的 Application Service 或 API 來達成排程任務的註冊與管理，以此保持微服務核心業務的絕對純潔性。
+### 1. 分散式叢集與高可用 (Cluster HA)
+透過 Quartz 的資料庫行鎖 (`QRTZ_LOCKS`) 機制實現多節點協作，防止排程重複執行並支援自動故障轉移（Failover）：
+- **動態識別**：各節點啟動時由 Spring 容器自動生成唯一的 `instanceId`。
+- **心跳監測**：節點每隔 15 秒向 `QRTZ_SCHEDULER_STATE` 資料表更新運行心跳。
 
-## 開發者指南
+### 2. 事務強一致性 (Transactional Integrity)
+本模組採用 **共享資料源 (Shared DataSource)** 策略：
+- **原子操作**：模組內部自定義表 (`schedule_job`, `schedule_calendar` 等) 與 Quartz 系統表 (`QRTZ_*`) 共用同一個 JDBC 連線與 Spring Transaction。
+- **雙向同步回滾**：更新排程或暫停/恢復時，若 Quartz 引擎拋出異常或資料庫操作失敗，兩側資料均同步回滾，杜絕狀態不一致的偏差。
 
-### 建立一支排程工作的步驟
+### 3. 領域輸入檢核與防腐 (Validation & Anti-Corruption)
+- 透過 `CronParserPort` (由 `CronParserAdapter` 實作) 於業務入口攔截語法錯誤，防止無效的 Cron 表達式進入系統模型中。
+- 全面支援 Spring Validation (`@Valid`)，並由 `GlobalExceptionHandler` 統一轉換為標準錯誤回應。
 
-1. 在 Scheduler 內建置相關排程工作
->* **實作 Job 類別**：建立一個實作 `org.quartz.Job` 的類別，並標註 `@Component` 由 Spring 託管。
->* **架構定位 (Inbound Adapter)**：在六角架構中，Quartz 的 `Job` 扮演的是 **驅動端適配器 (Inbound Adapter)**，職責等同於 API Controller。
->  * **✅ 允許介接**：只能注入並呼叫 **Application Service (Use Case / Inbound Port)**，將參數轉換為 Command，並由應用層統一管理事務邊界 (`@Transactional`)。
->  * **❌ 嚴禁介接**：絕對禁止直接注入 Outbound Port (如 DB Repository)、禁止在 `execute` 方法內直接編寫業務邏輯，也禁止由 Job 自行管理 Transaction。
->* **動態解析機制**：根據 `JobSchedulerAdapter.lookupJobClass` 的設計，系統會直接透過 **Bean Name** 來建置對應的 Job 類別。這避免了在資料庫硬編碼類別路徑 (Class Path)，包名更動時系統依然穩定，達到 Domain 與技術實作解耦。
+### 4. 模組定位與微服務整合策略
+**本專案定位為「共用技術模組」而非「獨立微服務」**：
+- **作為底層基底引入**：微服務專案引入本模組時，本模組應整體視為該微服務的 **基礎設施技術庫 (Technical Infrastructure)**。
+- **防止業務污染**：微服務核心商業領域不應直接耦合本模組的實體或資料表，微服務應定義自己的業務 Port，並在其 Infrastructure 層呼叫本模組公開的 UseCase 介面。
 
-2. 註冊該排程至系統中 (二擇一)
->* **系統啟動時註冊**：透過 `ScheduleJobRegistration` 監聽 `@EventListener(ApplicationReadyEvent.class)` 並呼叫 `initializeTask` 方法註冊（此方法具備冪等性 Replace 模式），確保在 Spring Boot 與 JPA 徹底初始化後才執行，避免 `JPA metamodel` 空白等錯誤。
->* **透過 API 動態新增**：呼叫 `POST /jobs/create-cron` 或 `POST /jobs/create-one-time`。
+---
 
-3. 自定義排程監聽器 (Observer Pattern)
->* 實作介面：建立類別並實作 `com.example.demo.application.shared.listener.JobStatusListener` 介面。
->* 業務隔離：純技術用途的監聽器（如耗時統計）可放於 `infra`，若牽涉業務邏輯（如失敗寄信、更新業務表）可放於 `application/service` 或 `iface`。
->* 集中註冊：在 `ScheduleJobRegistration.java` (設定層) 中，利用 `jobScheduler.registerJobListener()` 將自定義監聽器掛載至對應的 Job 上，完成解耦。
+## 三、 開發者指南
 
-## API 接口說明
+### 建立與註冊排程任務
 
-所有 API 基礎路徑為 /jobs。
+#### 1. 實作 Job 類別 (Inbound Adapter)
+在六角架構中，Quartz Job 屬於驅動端適配器（等同於 API Controller）：
+```java
+@Component("batchSendEmailJob")
+public class BatchSendEmailJob implements Job {
 
-**1. 查詢所有排程狀態**
->* Method: GET
->* Path: /status
->* 描述: 聚合資料庫配置與 Quartz 即時運行狀態。
->* 降級行為: 若引擎離線，state 欄位將顯示 UNKNOWN (ENGINE_OFFLINE)。
->* 響應: List<ScheduleJobView>
+    @Override
+    public void execute(JobExecutionContext context) throws JobExecutionException {
+        // 執行排程業務邏輯
+    }
+}
+```
+- **動態 Bean 解析機制**：排程註冊時僅需提供 Spring Bean Name（如 `"batchSendEmailJob"`），系統會透過 `AutowiringSpringBeanJobFactory` 自動解析與裝配，避免在資料庫硬編碼 Class Full Path，即使專案重構改動 Package 路徑也不影響排程執行。
 
-**2. 暫停排程任務**
->* Method: POST
->* Path: /pause/{jobId}
->* 描述: 根據 JobId 暫停任務。
->* 一致性: 採原子操作，若引擎同步失敗則回滾資料庫狀態。
+#### 2. 註冊排程任務 (二擇一)
+- **A. 系統啟動時初始化**：
+  在 `ScheduleJobRegistration` 中監聽 `ApplicationReadyEvent`，注入 `CreateCronJobUseCase`：
+  ```java
+  @Component
+  @RequiredArgsConstructor
+  public class ScheduleJobRegistration {
+      private final CreateCronJobUseCase createCronJobUseCase;
 
-**3. 重啟排程任務**
->* Method: POST
->* Path: /resume/{jobId}
->* 描述: 恢復已暫停的任務進入等待執行狀態。
+      @EventListener(ApplicationReadyEvent.class)
+      public void init() {
+          CreateCronJobCommand command = new CreateCronJobCommand(
+              "BatchEmailJob", "NotificationGroup", "batchSendEmailJob",
+              "0 0/5 * * * ?", null, true
+          );
+          createCronJobUseCase.initializeCronTask(command);
+      }
+  }
+  ```
+- **B. 透過 REST API 動態建立**：
+  呼叫 `POST /jobs/create-cron` 或 `POST /jobs/create-one-time`。
 
-**4. 更新排程執行時間**
->* Method: PUT
->* Path: `/{jobId}/update-cron` 或 `/{jobId}/update-one-time`
->* 描述: 修改特定任務的執行週期 (Cron 或單次執行時間)。
+#### 3. 註冊自定義排程監聽器 (Observer Pattern)
+- 實作 `JobStatusListener` 介面（可監聽任務啟動、結束、耗時與異常）。
+- 在啟動註冊類中透過 `JobSchedulerPort.registerJobListener()` 或 `registerGlobalListener()` 掛載。
 
-**5. 新增排程任務**
->* Method: POST
->* Path: `/create-cron` 或 `/create-one-time`
->* 描述: 註冊一個新的排程任務到系統與 Quartz 引擎中。需傳遞任務名稱、群組、排程時間以及對應的 Bean Name (`jobType`)。
->* 冪等性: 採用 Replace 模式，若相同 `name` 與 `group` 的排程已存在則會進行覆寫。
+---
 
-**6. 綁定日曆 (排除假日)**
->* Method: PUT
->* Path: `/{jobId}/bind-calendar`
->* 描述: 為排程任務綁定日曆黑名單，傳入空字串或 null 可解除綁定。
+## 四、 RESTful API 接口規格
 
-**7. 日曆黑名單管理 API**
->* 基礎路徑為 `/api/calendars`。提供 `POST /` (建立日曆)、`POST /{id}/holidays` (新增排除日期)、`DELETE /{id}/holidays/{date}` (移除排除日期) 等介面。
+所有排程管理 API 基礎路徑為 `/jobs`，日曆管理基礎路徑為 `/api/calendars`。
 
-## 運維監控與執行日誌
+### 1. 排程任務管理 (`/jobs`)
+| HTTP Method | Path | 依賴之 Inbound Port | 描述 |
+| :--- | :--- | :--- | :--- |
+| `POST` | `/jobs/create-cron` | `CreateCronJobUseCase` | 建立定時 Cron 排程任務 (具備覆寫冪等性) |
+| `POST` | `/jobs/create-one-time` | `CreateOneTimeJobUseCase` | 建立單次執行排程任務 |
+| `PUT` | `/jobs/{jobId}/update-cron` | `UpdateScheduleJobUseCase` | 更新指定任務之 Cron 表達式 |
+| `PUT` | `/jobs/{jobId}/update-one-time` | `UpdateScheduleJobUseCase` | 更新指定任務之單次執行時間 |
+| `PUT` | `/jobs/{jobId}/bind-calendar` | `BindJobCalendarUseCase` | 為任務綁定或解除特定排除日曆黑名單 |
+| `POST` | `/jobs/pause/{jobId}` | `PauseScheduleJobUseCase` | 暫停指定排程任務 (原子操作同步引擎) |
+| `POST` | `/jobs/resume/{jobId}` | `ResumeScheduleJobUseCase` | 恢復已被暫停的排程任務 |
+| `GET` | `/jobs/status` | `GetScheduleJobUseCase` | 分頁查詢目前資料庫配置與引擎即時狀態快照 |
 
-**1. 排程執行日誌持久化 (Job Execution Logging)**
-> 系統內建全域的排程歷史紀錄功能，可將每一次排程的成功、失敗、中止事件記錄於資料庫 `schedule_job_log` 表中。
->* **隔離的事務設計**: 核心採用 `REQUIRES_NEW` 開啟獨立事務，確保即使您的業務邏輯發生嚴重例外導致 Transaction Rollback，日誌依然能成功保存，精準記錄失敗原因。
->* **執行緒安全 (Thread-Safety)**: 底層使用 `ThreadLocal` 綁定 Quartz Worker Thread 記錄任務起始時間，在高併發執行下依然保證耗時計算 (`durationMs`) 的絕對正確。
->* **功能開關 (Feature Toggle)**: 預設關閉。可透過配置檔 `app.schedule.job-log.enabled=true` 開啟。關閉狀態下會直接 Return，達成真正的零效能負擔 (Zero Overhead)。
-**2. 分散式叢集下的 Listener 行為 (Distributed Listener Behavior)**
-> 在多節點的叢集環境中，Quartz 的 Listener 具備以下特性：
->* **叢集唯一觸發保證**: 依賴資料庫 `QRTZ_LOCKS` 行鎖機制，同一個排程任務在同一時間點只會被「一台」機器搶得執行權。因此，全域 Listener (如 `GlobalJobListener`, `PersistJobLogListener`) **只會在那一台執行的機器上被觸發一次**，不會產生併發重複寫入日誌的問題。
->* **業務冪等性需自行控制 (重要)**: 若執行任務的機器中途崩潰 (Crash) 且排程配置了 `RequestsRecovery`，Quartz 會將任務轉交由另一台機器重新執行，此時 Listener 會被**再次觸發**。Quartz 原生不保證 Listener 內部業務的絕對冪等，若於 Listener 內實作敏感業務 (如發信、扣款)，必須自行實作冪等控制 (如 Unique Key 或 Redis Check)。
+### 2. 排程日曆黑名單管理 (`/api/calendars`)
+| HTTP Method | Path | 依賴之 Inbound Port | 描述 |
+| :--- | :--- | :--- | :--- |
+| `POST` | `/api/calendars` | `CreateCalendarUseCase` | 建立全新的排除日曆黑名單 |
+| `GET` | `/api/calendars` | `GetCalendarUseCase` | 分頁查詢所有已設定的日曆清單 |
+| `GET` | `/api/calendars/{id}/holidays` | `GetCalendarUseCase` | 查詢特定日曆下所有的排除日期 |
+| `POST` | `/api/calendars/{id}/holidays` | `AddExcludedDateUseCase` | 為指定日曆新增單一排除日期 |
+| `DELETE` | `/api/calendars/{id}/holidays/{date}` | `RemoveExcludedDateUseCase` | 自指定日曆中移除排除日期 (如: 補班日) |
 
-**3. 異常代碼定義與輸入檢核 (Input Validation)**
-> 系統整合了 Spring Validation (`@Valid`, `jakarta.validation.constraints`) 進行第一線防呆，並由 `GlobalExceptionHandler` 統一攔截轉譯：
->* VALIDATION_FAILED (400): Request Body 缺少必填欄位 (如: `@NotBlank` 攔截)。
->* TYPE_MISMATCH (400): URL 參數格式轉換失敗 (如: LocalDate 需要 yyyy-MM-dd 卻傳入 yyyy/MM/dd)。
->* BAD_REQUEST (400): 領域模型的業務防呆檢查未通過 (攔截 `IllegalArgumentException`)。
->* INVALID_CRON (422): 使用者輸入的 Cron 格式錯誤（如：日與週同時指定）。
->* JOB_NOT_FOUND (404): 操作了不存在的任務識別碼。
->* ENGINE_ERROR (500): Quartz 引擎發生底層技術故障（如：資料庫連線中斷）。
+---
 
-**降級方案說明**
-> 當調用 getJobInfoResources 獲取監控清單時，若 Quartz 引擎離線，系統會自動切換為 UNKNOWN (ENGINE_OFFLINE) 狀態，此時僅顯示資料庫中的靜態配置，確保管理介面不因技術故障而崩潰。
+## 五、 運維監控、日誌與例外處理
+
+### 1. 排程執行日誌持久化 (`PersistJobLogListener`)
+- 系統支援記錄每一次排程執行的狀態、耗時 (`durationMs`) 與異常堆疊至 `schedule_job_log` 資料表。
+- **獨立事務設計**：日誌持久化採用 `Propagation.REQUIRES_NEW`，即使排程業務內部發生例外導致回滾，歷史日誌依然能獨立提交。
+- **功能開關**：由設定檔 `app.schedule.job-log.enabled=true` 進行控制，關閉時無任何效能耗損。
+
+### 2. 引擎離線降級機制 (Graceful Degradation)
+當呼叫 `/jobs/status` 查詢任務清單時，若 Quartz 引擎離線或短暫不可用，系統將自動啟動降級策略，狀態標記為 `UNKNOWN (ENGINE_OFFLINE)`，並呈現資料庫中的配置快照，保障管理端介面不中斷。
+
+### 3. 全域例外攔截與錯誤代碼
+| 錯誤代碼 (errorCode) | HTTP Status | 原因說明 |
+| :--- | :--- | :--- |
+| `VALIDATION_FAILED` | `400 Bad Request` | Request Body 必填欄位或約束校驗未通過 |
+| `TYPE_MISMATCH` | `400 Bad Request` | 請求參數型別轉換失敗 (如日期格式不符) |
+| `BAD_REQUEST` | `400 Bad Request` | 違反基本商業規則 (如重複新增相同日期) |
+| `INVALID_CRON` | `422 Unprocessable` | 輸入之 Cron 表達式語法無效 |
+| `JOB_NOT_FOUND` | `404 Not Found` | 指定之 `JobId` 排程任務不存在 |
+| `ENGINE_ERROR` | `500 Server Error` | 底層 Quartz 引擎操作故障 |

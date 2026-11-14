@@ -6,8 +6,8 @@ import org.quartz.DisallowConcurrentExecution;
 import org.quartz.JobExecutionContext;
 import org.springframework.stereotype.Component;
 
-import com.example.demo.application.domain.checkpoint.repository.JobExecutionCheckpointRepository;
 import com.example.demo.iface.scheduler.base.AbstractRecoverableBatchJob;
+import com.example.demo.infra.persistence.checkpoint.repository.JobExecutionCheckpointJpaRepository;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -23,7 +23,7 @@ import lombok.extern.slf4j.Slf4j;
 @DisallowConcurrentExecution
 public class FailoverSimulationJob extends AbstractRecoverableBatchJob {
 
-	public FailoverSimulationJob(JobExecutionCheckpointRepository checkpointRepository) {
+	public FailoverSimulationJob(JobExecutionCheckpointJpaRepository checkpointRepository) {
 		super(checkpointRepository);
 	}
 
@@ -38,10 +38,10 @@ public class FailoverSimulationJob extends AbstractRecoverableBatchJob {
 		// 這裡撰寫單一步驟的實際業務邏輯，例如：
 		// - 根據 currentStep 當作 Page Number 查詢資料庫
 		// - 寄送這一批次的信件
-		
+
 		// 模擬耗時操作 (每步 5 秒)，讓您有時間拔插頭測試 Failover
 		Thread.sleep(5000);
-		
+
 		// 回傳進度標記，這會被儲存到 Checkpoint 的 last_checkpoint 欄位
 		return "STEP_" + currentStep + "_DONE";
 	}
